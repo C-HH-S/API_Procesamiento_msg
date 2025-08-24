@@ -1,0 +1,113 @@
+# Crear el archivo .gitignore
+cat > .gitignore << 'EOF'
+# Entorno virtual
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# Archivos de entorno
+.env
+.env.local
+.env.production
+.env.development
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Instalaciones de pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Base de datos
+*.db
+*.sqlite3
+*.sqlite
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos de configuración local
+config_local.py
+settings_local.py
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos compilados
+*.class
+*.exe
+*.dll
+
+# Packaged files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Documentación generada
+docs/_build/
+EOF
