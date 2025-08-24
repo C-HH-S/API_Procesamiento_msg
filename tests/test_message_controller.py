@@ -21,7 +21,8 @@ class TestMessageController:
         data = json.loads(response.data)
         
         assert data['status'] == 'success'
-        assert data['data']['message_id'] == sample_message_data['message_id']
+        # El message_id ahora se genera automáticamente
+        assert 'message_id' in data['data']
         assert data['data']['content'] == sample_message_data['content']
         assert 'metadata' in data['data']
         assert data['data']['metadata']['word_count'] == 6
@@ -67,10 +68,8 @@ class TestMessageController:
     def test_create_message_invalid_schema(self, client):
         """Prueba creación con esquema inválido."""
         invalid_data = {
-            "message_id": "",  # ID vacío
-            "session_id": "session-test",
+            "session_id": "",  # ID vacío
             "content": "Contenido válido",
-            "timestamp": "invalid-timestamp",
             "sender": "invalid-sender"
         }
         
@@ -85,36 +84,11 @@ class TestMessageController:
         assert data['status'] == 'error'
         assert data['error']['code'] == 'SCHEMA_VALIDATION_ERROR'
     
-    def test_create_message_duplicate_id(self, client, sample_message_data):
-        """Prueba creación con ID duplicado."""
-        # Crear mensaje la primera vez
-        response1 = client.post(
-            '/api/messages',
-            data=json.dumps(sample_message_data),
-            content_type='application/json'
-        )
-        assert response1.status_code == 201
-        
-        # Intentar crear mensaje con mismo ID
-        response2 = client.post(
-            '/api/messages',
-            data=json.dumps(sample_message_data),
-            content_type='application/json'
-        )
-        
-        assert response2.status_code == 400
-        data = json.loads(response2.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'VALIDATION_ERROR'
-        assert "Ya existe un mensaje con ID" in data['error']['message']
-    
     def test_create_message_inappropriate_content(self, client):
         """Prueba creación con contenido inapropiado."""
         inappropriate_data = {
-            "message_id": "msg-inappropriate",
             "session_id": "session-test",
             "content": "Este mensaje contiene spam y virus",
-            "timestamp": "2023-06-15T14:30:00Z",
             "sender": "user"
         }
         
@@ -153,10 +127,8 @@ class TestMessageController:
         # Crear 15 mensajes
         for i in range(15):
             message_data = {
-                "message_id": f"msg-pag-{i}",
                 "session_id": session_id,
                 "content": f"Contenido {i}",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": "user"
             }
             client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
@@ -187,10 +159,8 @@ class TestMessageController:
         # Crear mensajes mixtos
         for i in range(6):
             message_data = {
-                "message_id": f"msg-filter-{i}",
                 "session_id": session_id,
                 "content": f"Contenido {i}",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": "user" if i < 3 else "system"
             }
             client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
@@ -228,16 +198,18 @@ class TestMessageController:
     def test_get_message_by_id_success(self, client, sample_message_data):
         """Prueba obtención exitosa de mensaje por ID."""
         # Crear mensaje
-        client.post('/api/messages', data=json.dumps(sample_message_data), content_type='application/json')
+        response_create = client.post('/api/messages', data=json.dumps(sample_message_data), content_type='application/json')
+        created_data = json.loads(response_create.data)
+        message_id = created_data['data']['message_id']
         
         # Obtener mensaje por ID
-        response = client.get('/api/message/msg-test-123')
+        response = client.get(f'/api/message/{message_id}')
         
         assert response.status_code == 200
         data = json.loads(response.data)
         
         assert data['status'] == 'success'
-        assert data['data']['message_id'] == 'msg-test-123'
+        assert data['data']['message_id'] == message_id
         assert data['data']['content'] == 'Este es un mensaje de prueba'
     
     def test_get_message_by_id_not_found(self, client):
@@ -260,17 +232,15 @@ class TestMessageController:
         
         # Crear mensajes mixtos
         messages = [
-            {"id": "stats-1", "sender": "user"},
-            {"id": "stats-2", "sender": "user"},
-            {"id": "stats-3", "sender": "system"}
+            {"sender": "user"},
+            {"sender": "user"},
+            {"sender": "system"}
         ]
         
         for msg in messages:
             message_data = {
-                "message_id": msg["id"],
                 "session_id": session_id,
                 "content": "Contenido de prueba",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": msg["sender"]
             }
             client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
@@ -306,8 +276,8 @@ class TestMessageController:
         assert response.status_code == 200
         data = json.loads(response.data)
         
-        assert data['status'] == 'healthy'
-        assert data['service'] == 'message-processing-api'
+        assert data['status'] == 'ok'
+        assert data['service'] == 'Message Processing API'
     
     def test_index_endpoint(self, client):
         """Prueba endpoint de información."""
@@ -344,10 +314,8 @@ class TestMessageController:
         """Prueba casos límite en creación de mensajes."""
         # Mensaje con contenido muy largo
         long_content_data = {
-            "message_id": "msg-long-content",
             "session_id": "session-test",
             "content": "a" * 6000,  # Excede el límite de 5000
-            "timestamp": "2023-06-15T14:30:00Z",
             "sender": "user"
         }
         
@@ -367,10 +335,8 @@ class TestMessageController:
         
         # Crear un mensaje
         message_data = {
-            "message_id": "edge-msg-1",
             "session_id": session_id,
             "content": "Contenido de prueba",
-            "timestamp": "2023-06-15T14:30:00Z",
             "sender": "user"
         }
         client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')

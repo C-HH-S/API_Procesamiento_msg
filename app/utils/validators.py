@@ -3,7 +3,6 @@ Validadores para la aplicación.
 Este módulo contiene funciones de validación para mensajes y otros datos.
 """
 import re
-from datetime import datetime
 from typing import Dict, List, Any
 from .exceptions import ValidationError, InvalidFormatError, InappropriateContentError
 
@@ -25,7 +24,7 @@ class MessageValidator:
             InvalidFormatError: Si el formato es inválido
         """
         # Validar campos requeridos
-        required_fields = ['message_id', 'session_id', 'content', 'timestamp', 'sender']
+        required_fields = ['session_id', 'content', 'sender']
         missing_fields = [field for field in required_fields if field not in data or data[field] is None]
         
         if missing_fields:
@@ -35,20 +34,9 @@ class MessageValidator:
             )
         
         # Validar tipos y formatos
-        MessageValidator.validate_message_id(data['message_id'])
         MessageValidator.validate_session_id(data['session_id'])
         MessageValidator.validate_content(data['content'])
-        MessageValidator.validate_timestamp(data['timestamp'])
         MessageValidator.validate_sender(data['sender'])
-    
-    @staticmethod
-    def validate_message_id(message_id: str) -> None:
-        """Valida el ID del mensaje."""
-        if not isinstance(message_id, str) or not message_id.strip():
-            raise InvalidFormatError("message_id debe ser una cadena no vacía")
-        
-        if len(message_id) > 255:
-            raise InvalidFormatError("message_id no puede exceder 255 caracteres")
     
     @staticmethod
     def validate_session_id(session_id: str) -> None:
@@ -70,25 +58,6 @@ class MessageValidator:
         
         if len(content) > 5000:
             raise InvalidFormatError("content no puede exceder 5000 caracteres")
-    
-    @staticmethod
-    def validate_timestamp(timestamp: str) -> datetime:
-        """
-        Valida y convierte el timestamp.
-        
-        Returns:
-            datetime: Objeto datetime parseado
-        """
-        if not isinstance(timestamp, str):
-            raise InvalidFormatError("timestamp debe ser una cadena")
-        
-        try:
-            # Intentar parsear formato ISO 8601
-            return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        except ValueError:
-            raise InvalidFormatError(
-                "timestamp debe estar en formato ISO 8601 (ej: 2023-06-15T14:30:00Z)"
-            )
     
     @staticmethod
     def validate_sender(sender: str) -> None:

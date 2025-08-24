@@ -1,5 +1,5 @@
 """
-Lógica de negocio para el procesamiento de mensajes.
+Lógica de negocio para el procesamiento de mensajes - Versión corregida.
 Este módulo contiene toda la lógica de negocio para el manejo de mensajes.
 """
 from typing import Dict, Any, List, Tuple, Optional
@@ -40,11 +40,11 @@ class MessageService:
             InappropriateContentError: Si contiene contenido inapropiado
             MessageProcessingError: Si el message_id ya existe
         """
-        # 1. Validar formato del mensaje
-        MessageValidator.validate_message_data(message_data)
+        # 1. Validar campos básicos requeridos
+        self._validate_basic_fields(message_data)
         
-        # 2. Verificar si el message_id ya existe
-        if self.message_repository.exists_by_message_id(message_data['message_id']):
+        # 2. Verificar si el message_id ya existe (solo si se proporciona)
+        if message_data.get('message_id') and self.message_repository.exists_by_message_id(message_data['message_id']):
             raise ValidationError(f"Ya existe un mensaje con ID: {message_data['message_id']}")
         
         # 3. Filtrar contenido inapropiado
@@ -53,15 +53,44 @@ class MessageService:
             self.inappropriate_words
         )
         
-        # 4. Procesar y agregar metadatos
-        processed_data = self._add_metadata(message_data)
+        # 4. Crear mensaje con metadatos calculados automáticamente
+        message = self._create_message_from_data(message_data)
         
-        # 5. Crear y guardar el mensaje
-        message = self._create_message_from_data(processed_data)
+        # 5. Guardar mensaje
         saved_message = self.message_repository.save(message)
         
         # 6. Retornar mensaje procesado
         return saved_message.to_dict()
+    
+    def _validate_basic_fields(self, data: Dict[str, Any]) -> None:
+        """
+        Valida los campos básicos requeridos.
+        
+        Args:
+            data: Diccionario con los datos del mensaje
+            
+        Raises:
+            ValidationError: Si faltan campos requeridos
+            InvalidFormatError: Si el formato es inválido
+        """
+        # Campos requeridos (sin message_id porque se genera automáticamente)
+        required_fields = ['session_id', 'content', 'sender']
+        missing_fields = [field for field in required_fields if field not in data or data[field] is None]
+        
+        if missing_fields:
+            raise ValidationError(
+                f"Campos requeridos faltantes: {', '.join(missing_fields)}",
+                details={"missing_fields": missing_fields}
+            )
+        
+        # Validar tipos y formatos
+        MessageValidator.validate_session_id(data['session_id'])
+        MessageValidator.validate_content(data['content'])
+        MessageValidator.validate_sender(data['sender'])
+        
+        # Validar message_id solo si se proporciona
+        if data.get('message_id'):
+            MessageValidator.validate_message_id(data['message_id'])
     
     def get_messages_by_session(
         self, 
@@ -97,9 +126,6 @@ class MessageService:
             session_id, limit, offset, sender
         )
         
-        # Si no hay mensajes, no es necesariamente un error
-        # Puede ser una sesión nueva o sin mensajes que coincidan con los filtros
-        
         # Preparar respuesta
         return {
             'messages': [message.to_dict() for message in messages],
@@ -131,56 +157,29 @@ class MessageService:
         
         return message.to_dict()
     
-    def _add_metadata(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_message_from_data(self, message_data: Dict[str, Any]) -> Message:
         """
-        Agrega metadatos al mensaje.
+        Crea una instancia de Message desde los datos.
         
         Args:
-            message_data: Datos originales del mensaje
-            
-        Returns:
-            Dict: Datos del mensaje con metadatos agregados
-        """
-        content = message_data['content']
-        
-        # Calcular metadatos
-        word_count = len(content.split()) if content.strip() else 0
-        character_count = len(content)
-        
-        # Crear copia de los datos originales
-        processed_data = message_data.copy()
-        
-        # Agregar metadatos
-        processed_data.update({
-            'word_count': word_count,
-            'character_count': character_count,
-            'processed_at': datetime.now(timezone.utc)
-        })
-        
-        return processed_data
-    
-    def _create_message_from_data(self, processed_data: Dict[str, Any]) -> Message:
-        """
-        Crea una instancia de Message desde los datos procesados.
-        
-        Args:
-            processed_data: Datos del mensaje con metadatos
+            message_data: Datos del mensaje
             
         Returns:
             Message: Instancia del mensaje
         """
-        # Parsear timestamp
-        timestamp = MessageValidator.validate_timestamp(processed_data['timestamp'])
+        # Parsear timestamp si se proporciona
+        timestamp = None
+        if message_data.get('timestamp'):
+            timestamp = MessageValidator.validate_timestamp(message_data['timestamp'])
         
-        # Crear mensaje
+        # Crear mensaje (el constructor se encarga de generar automáticamente
+        # los campos que no se proporcionen)
         message = Message(
-            message_id=processed_data['message_id'],
-            session_id=processed_data['session_id'],
-            content=processed_data['content'],
-            timestamp=timestamp,
-            sender=processed_data['sender'],
-            word_count=processed_data['word_count'],
-            character_count=processed_data['character_count']
+            session_id=message_data['session_id'],
+            content=message_data['content'],
+            sender=message_data['sender'],
+            message_id=message_data.get('message_id'),  # Puede ser None
+            timestamp=timestamp  # Puede ser None
         )
         
         return message

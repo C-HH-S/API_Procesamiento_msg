@@ -3,7 +3,7 @@ Pruebas unitarias para MessageRepository.
 Este módulo prueba todas las operaciones de base de datos.
 """
 import pytest
-from datetime import datetime, timezone  # <-- IMPORT CORREGIDO
+from datetime import datetime
 from app.models.message import Message
 from app.utils.exceptions import DatabaseError
 
@@ -13,12 +13,10 @@ class TestMessageRepository:
     def test_save_message_success(self, app, message_repository):
         """Prueba guardar un mensaje exitosamente."""
         with app.app_context():
-            # Crear mensaje
+            # Crear mensaje (message_id se genera automáticamente)
             message = Message(
-                message_id="test-msg-1",
                 session_id="test-session-1",
                 content="Contenido de prueba",
-                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
             
@@ -27,30 +25,30 @@ class TestMessageRepository:
             
             # Verificaciones
             assert saved_message.id is not None
-            assert saved_message.message_id == "test-msg-1"
+            assert saved_message.message_id is not None
+            assert len(saved_message.message_id) == 36  # UUID format
             assert saved_message.session_id == "test-session-1"
             assert saved_message.content == "Contenido de prueba"
             assert saved_message.sender == "user"
+            assert saved_message.timestamp is not None
     
     def test_find_by_message_id_exists(self, app, message_repository):
         """Prueba buscar un mensaje que existe."""
         with app.app_context():
             # Crear y guardar mensaje
             message = Message(
-                message_id="test-msg-2",
                 session_id="test-session-1",
                 content="Contenido de prueba",
-                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
-            message_repository.save(message)
+            saved_message = message_repository.save(message)
             
             # Buscar mensaje
-            found_message = message_repository.find_by_message_id("test-msg-2")
+            found_message = message_repository.find_by_message_id(saved_message.message_id)
             
             # Verificaciones
             assert found_message is not None
-            assert found_message.message_id == "test-msg-2"
+            assert found_message.message_id == saved_message.message_id
     
     def test_find_by_message_id_not_exists(self, app, message_repository):
         """Prueba buscar un mensaje que no existe."""
@@ -67,10 +65,8 @@ class TestMessageRepository:
             messages = []
             for i in range(5):
                 message = Message(
-                    message_id=f"test-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i % 2 == 0 else "system"
                 )
                 message_repository.save(message)
@@ -92,10 +88,8 @@ class TestMessageRepository:
             # Crear 15 mensajes
             for i in range(15):
                 message = Message(
-                    message_id=f"pag-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)
@@ -129,10 +123,8 @@ class TestMessageRepository:
             # Crear mensajes con diferentes senders
             for i in range(6):
                 message = Message(
-                    message_id=f"filter-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i < 3 else "system"
                 )
                 message_repository.save(message)
@@ -156,21 +148,19 @@ class TestMessageRepository:
     def test_exists_by_message_id(self, app, message_repository):
         """Prueba verificación de existencia por message_id."""
         with app.app_context():
-            # Verificar que no existe inicialmente
-            assert not message_repository.exists_by_message_id("test-exists")
-            
             # Crear mensaje
             message = Message(
-                message_id="test-exists",
                 session_id="test-session",
                 content="Contenido",
-                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
-            message_repository.save(message)
+            saved_message = message_repository.save(message)
             
-            # Verificar que ahora existe
-            assert message_repository.exists_by_message_id("test-exists")
+            # Verificar que existe
+            assert message_repository.exists_by_message_id(saved_message.message_id)
+            
+            # Verificar que no existe uno inexistente
+            assert not message_repository.exists_by_message_id("non-existent")
     
     def test_count_by_session_id(self, app, message_repository):
         """Prueba conteo de mensajes por session_id."""
@@ -183,10 +173,8 @@ class TestMessageRepository:
             # Crear 3 mensajes
             for i in range(3):
                 message = Message(
-                    message_id=f"count-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)
@@ -202,10 +190,8 @@ class TestMessageRepository:
             # Crear mensajes mixtos
             for i in range(4):
                 message = Message(
-                    message_id=f"count-filter-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i < 2 else "system"
                 )
                 message_repository.save(message)
@@ -224,23 +210,21 @@ class TestMessageRepository:
         with app.app_context():
             # Crear mensaje
             message = Message(
-                message_id="test-delete",
                 session_id="test-session",
                 content="Contenido a eliminar",
-                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
-            message_repository.save(message)
+            saved_message = message_repository.save(message)
             
             # Verificar que existe
-            assert message_repository.exists_by_message_id("test-delete")
+            assert message_repository.exists_by_message_id(saved_message.message_id)
             
             # Eliminar mensaje
-            deleted = message_repository.delete_by_message_id("test-delete")
+            deleted = message_repository.delete_by_message_id(saved_message.message_id)
             assert deleted is True
             
             # Verificar que ya no existe
-            assert not message_repository.exists_by_message_id("test-delete")
+            assert not message_repository.exists_by_message_id(saved_message.message_id)
     
     def test_delete_by_message_id_not_exists(self, app, message_repository):
         """Prueba eliminación de mensaje que no existe."""
@@ -256,10 +240,8 @@ class TestMessageRepository:
             # Crear mensajes con diferentes session_ids
             for i, session_id in enumerate(session_ids):
                 message = Message(
-                    message_id=f"session-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)

@@ -11,6 +11,7 @@ from app.models.message import db
 from app.repositories.message_repository import MessageRepository
 from app.services.message_service import MessageService
 from app.controllers.message_controller import MessageController
+from datetime import datetime, timezone  
 
 def create_app(config_name=None):
     """
@@ -28,6 +29,9 @@ def create_app(config_name=None):
     # Configurar la aplicación
     config_name = config_name or os.getenv('FLASK_ENV', 'development')
     app.config.from_object(config[config_name])
+    app.config['JSON_AS_ASCII'] = False  # Para caracteres especiales (tildes, ñ, etc.)
+    app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
+    app.config['JSON_SORT_KEYS'] = False    
     
     # Configurar CORS para permitir peticiones desde frontend
     CORS(app)
@@ -74,9 +78,11 @@ def setup_dependencies(app):
     def health_check():
         """Endpoint para verificar el estado de la aplicación."""
         return {
-            'status': 'healthy',
-            'service': 'message-processing-api',
-            'version': '1.0.0'
+            'status': 'ok',
+            'message': 'Servicio funcionando correctamente',
+            'service': 'Message Processing API',
+            'timestamp': datetime.now(timezone.utc),
+            'encoding': 'UTF-8 ✓'
         }
     
     @app.route('/')

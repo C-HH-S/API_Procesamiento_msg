@@ -1,11 +1,12 @@
 """
-Controladores para la API de mensajes.
+Controladores para la API de mensajes - Versión corregida.
 Este módulo maneja las peticiones HTTP y coordina las respuestas.
 """
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError as MarshmallowValidationError
 from typing import Tuple
 import json
+import traceback
 from werkzeug.exceptions import BadRequest
 
 from app.services.message_service import MessageService
@@ -61,7 +62,7 @@ class MessageController:
             # 2. Obtener datos de la petición con manejo de JSON inválido
             try:
                 json_data = request.get_json()
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, BadRequest) as e:
                 return self._error_response(
                     "INVALID_JSON",
                     "JSON malformado en el cuerpo de la petición"
@@ -94,13 +95,6 @@ class MessageController:
             
             return response_data, 201
         
-        except BadRequest as e:
-            # Captura específicamente los errores BadRequest de Flask/Werkzeug
-            return self._error_response(
-                "INVALID_JSON",
-                "JSON malformado en el cuerpo de la petición"
-            ), 400
-            
         except ValidationError as e:
             return self._error_response(e.code, e.message, getattr(e, 'details', None)), e.status_code
         except InvalidFormatError as e:
@@ -110,9 +104,13 @@ class MessageController:
         except DatabaseError as e:
             return self._error_response(e.code, e.message), 500
         except Exception as e:
+            # Log del error para debugging
+            print(f"Error inesperado en create_message: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
             return self._error_response(
                 "INTERNAL_ERROR",
-                "Error interno del servidor"
+                f"Error interno del servidor: {str(e)}"
             ), 500
     
     def get_messages_by_session(self, session_id: str) -> Tuple[dict, int]:
@@ -158,9 +156,12 @@ class MessageController:
         except DatabaseError as e:
             return self._error_response(e.code, e.message), 500
         except Exception as e:
+            print(f"Error inesperado en get_messages_by_session: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
             return self._error_response(
                 "INTERNAL_ERROR",
-                "Error interno del servidor"
+                f"Error interno del servidor: {str(e)}"
             ), 500
     
     def get_message_by_id(self, message_id: str) -> Tuple[dict, int]:
@@ -198,9 +199,12 @@ class MessageController:
         except DatabaseError as e:
             return self._error_response(e.code, e.message), 500
         except Exception as e:
+            print(f"Error inesperado en get_message_by_id: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
             return self._error_response(
                 "INTERNAL_ERROR",
-                "Error interno del servidor"
+                f"Error interno del servidor: {str(e)}"
             ), 500
     
     def get_session_stats(self, session_id: str) -> Tuple[dict, int]:
@@ -236,9 +240,12 @@ class MessageController:
         except DatabaseError as e:
             return self._error_response(e.code, e.message), 500
         except Exception as e:
+            print(f"Error inesperado en get_session_stats: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
             return self._error_response(
                 "INTERNAL_ERROR",
-                "Error interno del servidor"
+                f"Error interno del servidor: {str(e)}"
             ), 500
     
     def _error_response(self, code: str, message: str, details=None) -> dict:

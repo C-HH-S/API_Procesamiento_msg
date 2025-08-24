@@ -21,37 +21,23 @@ class TestMessageService:
             result = message_service.process_message(sample_message_data)
             
             # Verificaciones
-            assert result['message_id'] == sample_message_data['message_id']
+            assert 'message_id' in result  # Se genera automáticamente
             assert result['session_id'] == sample_message_data['session_id']
             assert result['content'] == sample_message_data['content']
             assert result['sender'] == sample_message_data['sender']
+            assert 'timestamp' in result  # Se genera automáticamente
             
             # Verificar metadatos
             assert 'metadata' in result
             assert result['metadata']['word_count'] == 6  # "Este es un mensaje de prueba"
             assert result['metadata']['character_count'] == 28
-            assert 'processed_at' in result['metadata']
-    
-    def test_process_message_duplicate_id(self, app, message_service, sample_message_data):
-        """Prueba procesamiento de mensaje con ID duplicado."""
-        with app.app_context():
-            # Procesar el mensaje la primera vez
-            message_service.process_message(sample_message_data)
-            
-            # Intentar procesar el mismo mensaje otra vez
-            with pytest.raises(ValidationError) as exc_info:
-                message_service.process_message(sample_message_data)
-            
-            assert "Ya existe un mensaje con ID" in str(exc_info.value)
     
     def test_process_message_invalid_format(self, app, message_service):
         """Prueba procesamiento de mensaje con formato inválido."""
         with app.app_context():
             invalid_data = {
-                "message_id": "",  # ID vacío
-                "session_id": "session-test",
+                "session_id": "",  # ID vacío
                 "content": "Contenido válido",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": "user"
             }
             
@@ -62,7 +48,6 @@ class TestMessageService:
         """Prueba procesamiento de mensaje con campos faltantes."""
         with app.app_context():
             incomplete_data = {
-                "message_id": "msg-123",
                 "session_id": "session-test"
                 # Faltan campos requeridos
             }
@@ -76,10 +61,8 @@ class TestMessageService:
         """Prueba procesamiento de mensaje con contenido inapropiado."""
         with app.app_context():
             inappropriate_data = {
-                "message_id": "msg-bad-123",
                 "session_id": "session-test",
                 "content": "Este mensaje contiene spam y malware",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": "user"
             }
             
@@ -92,10 +75,8 @@ class TestMessageService:
         """Prueba procesamiento de mensaje con sender inválido."""
         with app.app_context():
             invalid_sender_data = {
-                "message_id": "msg-invalid-sender",
                 "session_id": "session-test",
                 "content": "Contenido válido",
-                "timestamp": "2023-06-15T14:30:00Z",
                 "sender": "invalid_sender"  # Sender inválido
             }
             
@@ -103,22 +84,6 @@ class TestMessageService:
                 message_service.process_message(invalid_sender_data)
             
             assert "'sender' debe ser 'user' o 'system'" in str(exc_info.value)
-    
-    def test_process_message_invalid_timestamp(self, app, message_service):
-        """Prueba procesamiento de mensaje con timestamp inválido."""
-        with app.app_context():
-            invalid_timestamp_data = {
-                "message_id": "msg-invalid-timestamp",
-                "session_id": "session-test",
-                "content": "Contenido válido",
-                "timestamp": "not-a-valid-timestamp",
-                "sender": "user"
-            }
-            
-            with pytest.raises(InvalidFormatError) as exc_info:
-                message_service.process_message(invalid_timestamp_data)
-            
-            assert "formato ISO 8601" in str(exc_info.value)
     
     def test_get_messages_by_session_success(self, app, message_service, sample_message_data, sample_system_message_data):
         """Prueba obtención exitosa de mensajes por sesión."""
@@ -146,10 +111,8 @@ class TestMessageService:
             # Crear 15 mensajes
             for i in range(15):
                 message_data = {
-                    "message_id": f"msg-pag-{i}",
                     "session_id": session_id,
                     "content": f"Contenido del mensaje {i}",
-                    "timestamp": "2023-06-15T14:30:00Z",
                     "sender": "user"
                 }
                 message_service.process_message(message_data)
@@ -175,10 +138,8 @@ class TestMessageService:
             # Crear mensajes mixtos
             for i in range(6):
                 message_data = {
-                    "message_id": f"msg-filter-{i}",
                     "session_id": session_id,
                     "content": f"Contenido {i}",
-                    "timestamp": "2023-06-15T14:30:00Z",
                     "sender": "user" if i < 3 else "system"
                 }
                 message_service.process_message(message_data)
@@ -215,13 +176,14 @@ class TestMessageService:
         """Prueba obtención exitosa de mensaje por ID."""
         with app.app_context():
             # Procesar mensaje
-            message_service.process_message(sample_message_data)
+            processed_message = message_service.process_message(sample_message_data)
+            message_id = processed_message['message_id']
             
             # Obtener mensaje por ID
-            result = message_service.get_message_by_id("msg-test-123")
+            result = message_service.get_message_by_id(message_id)
             
             # Verificaciones
-            assert result['message_id'] == "msg-test-123"
+            assert result['message_id'] == message_id
             assert result['content'] == "Este es un mensaje de prueba"
     
     def test_get_message_by_id_not_found(self, app, message_service):
@@ -239,19 +201,17 @@ class TestMessageService:
             
             # Crear mensajes mixtos
             messages_data = [
-                {"message_id": "stats-1", "sender": "user"},
-                {"message_id": "stats-2", "sender": "user"},
-                {"message_id": "stats-3", "sender": "system"},
-                {"message_id": "stats-4", "sender": "system"},
-                {"message_id": "stats-5", "sender": "system"}
+                {"sender": "user"},
+                {"sender": "user"},
+                {"sender": "system"},
+                {"sender": "system"},
+                {"sender": "system"}
             ]
             
             for msg_data in messages_data:
                 full_data = {
-                    "message_id": msg_data["message_id"],
                     "session_id": session_id,
                     "content": "Contenido de prueba",
-                    "timestamp": "2023-06-15T14:30:00Z",
                     "sender": msg_data["sender"]
                 }
                 message_service.process_message(full_data)

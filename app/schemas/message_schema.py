@@ -1,34 +1,25 @@
 """
-Esquemas de serialización para la API.
+Esquemas de serialización para la API - Versión simplificada.
 Este módulo define los esquemas de validación y serialización usando Marshmallow.
 """
-from marshmallow import Schema, fields, validate, validates_schema, ValidationError
-from datetime import datetime
+from marshmallow import Schema, fields, validate
 
 class MessageInputSchema(Schema):
     """Esquema para validar entrada de mensajes."""
     
-    message_id = fields.Str(required=True, validate=validate.Length(min=1, max=255))
+    # message_id es opcional, se genera automáticamente si no se proporciona
+    message_id = fields.Str(validate=validate.Length(min=1, max=255), allow_none=True, missing=None)
     session_id = fields.Str(required=True, validate=validate.Length(min=1, max=255))
     content = fields.Str(required=True, validate=validate.Length(min=1, max=5000))
-    timestamp = fields.Str(required=True)
     sender = fields.Str(required=True, validate=validate.OneOf(['user', 'system']))
-    
-    @validates_schema
-    def validate_timestamp(self, data, **kwargs):
-        """Valida que el timestamp sea un formato ISO válido."""
-        try:
-            timestamp_str = data.get('timestamp', '')
-            datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        except (ValueError, TypeError):
-            raise ValidationError("timestamp debe estar en formato ISO 8601 (ej: 2023-06-15T14:30:00Z)")
+    # timestamp es opcional, se genera automáticamente si no se proporciona
+    timestamp = fields.Str(allow_none=True, missing=None)
 
 class MessageMetadataSchema(Schema):
     """Esquema para metadatos del mensaje."""
     
     word_count = fields.Int()
     character_count = fields.Int()
-    processed_at = fields.Str()
 
 class MessageOutputSchema(Schema):
     """Esquema para salida de mensajes."""

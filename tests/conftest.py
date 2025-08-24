@@ -56,10 +56,8 @@ def message_service(app, message_repository):
 def sample_message_data():
     """Fixture con datos de mensaje de prueba válidos."""
     return {
-        "message_id": "msg-test-123",
         "session_id": "session-test-abc",
         "content": "Este es un mensaje de prueba",
-        "timestamp": "2023-06-15T14:30:00Z",
         "sender": "user"
     }
 
@@ -67,10 +65,8 @@ def sample_message_data():
 def sample_system_message_data():
     """Fixture con datos de mensaje del sistema."""
     return {
-        "message_id": "msg-system-456",
         "session_id": "session-test-abc",
         "content": "Respuesta del sistema automática",
-        "timestamp": "2023-06-15T14:30:05Z",
         "sender": "system"
     }
 
@@ -78,9 +74,7 @@ def sample_system_message_data():
 def invalid_message_data():
     """Fixture con datos de mensaje inválidos."""
     return {
-        "message_id": "",  # ID vacío
-        "session_id": "session-test",
+        "session_id": "",  # session_id vacío
         "content": "",  # Contenido vacío
-        "timestamp": "invalid-date",  # Fecha inválida
         "sender": "invalid"  # Sender inválido
     }
