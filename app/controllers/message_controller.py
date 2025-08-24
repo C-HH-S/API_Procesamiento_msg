@@ -94,7 +94,12 @@ class MessageController:
             
             return response_data, 201
         
-        
+        except BadRequest as e:
+            # Captura específicamente los errores BadRequest de Flask/Werkzeug
+            return self._error_response(
+                "INVALID_JSON",
+                "JSON malformado en el cuerpo de la petición"
+            ), 400
             
         except ValidationError as e:
             return self._error_response(e.code, e.message, getattr(e, 'details', None)), e.status_code

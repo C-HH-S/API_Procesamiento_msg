@@ -55,7 +55,7 @@ class TestMessageController:
         """Prueba creación con payload vacío."""
         response = client.post(
             '/api/messages',
-            data=None,
+            data='{}',
             content_type='application/json'
         )
         
