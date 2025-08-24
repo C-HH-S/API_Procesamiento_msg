@@ -3,7 +3,7 @@ Lógica de negocio para el procesamiento de mensajes.
 Este módulo contiene toda la lógica de negocio para el manejo de mensajes.
 """
 from typing import Dict, Any, List, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.message import Message
 from app.repositories.message_repository import MessageRepository
@@ -154,7 +154,7 @@ class MessageService:
         processed_data.update({
             'word_count': word_count,
             'character_count': character_count,
-            'processed_at': datetime.utcnow()
+            'processed_at': datetime.now(timezone.utc)
         })
         
         return processed_data

@@ -2,7 +2,7 @@
 Modelos de datos para la aplicación.
 Este módulo define las entidades de base de datos usando SQLAlchemy.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 # Instancia global de SQLAlchemy
@@ -27,11 +27,9 @@ class Message(db.Model):
     # Metadatos del mensaje
     word_count = db.Column(db.Integer, nullable=False, default=0)
     character_count = db.Column(db.Integer, nullable=False, default=0)
-    processed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    
-    # Timestamps de auditoría
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     def __init__(self, message_id, session_id, content, timestamp, sender, word_count=0, character_count=0):
         """
@@ -53,7 +51,7 @@ class Message(db.Model):
         self.sender = sender
         self.word_count = word_count if word_count > 0 else self._calculate_word_count(content)
         self.character_count = character_count if character_count > 0 else len(content)
-        self.processed_at = datetime.utcnow()
+        self.processed_at = datetime.now(timezone.utc)
     
     def _calculate_word_count(self, content):
         """Calcula el número de palabras en el contenido."""

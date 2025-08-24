@@ -3,7 +3,7 @@ Pruebas unitarias para MessageRepository.
 Este módulo prueba todas las operaciones de base de datos.
 """
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone  # <-- IMPORT CORREGIDO
 from app.models.message import Message
 from app.utils.exceptions import DatabaseError
 
@@ -18,7 +18,7 @@ class TestMessageRepository:
                 message_id="test-msg-1",
                 session_id="test-session-1",
                 content="Contenido de prueba",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
             
@@ -40,7 +40,7 @@ class TestMessageRepository:
                 message_id="test-msg-2",
                 session_id="test-session-1",
                 content="Contenido de prueba",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
             message_repository.save(message)
@@ -70,7 +70,7 @@ class TestMessageRepository:
                     message_id=f"test-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i % 2 == 0 else "system"
                 )
                 message_repository.save(message)
@@ -95,7 +95,7 @@ class TestMessageRepository:
                     message_id=f"pag-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)
@@ -132,7 +132,7 @@ class TestMessageRepository:
                     message_id=f"filter-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i < 3 else "system"
                 )
                 message_repository.save(message)
@@ -164,7 +164,7 @@ class TestMessageRepository:
                 message_id="test-exists",
                 session_id="test-session",
                 content="Contenido",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
             message_repository.save(message)
@@ -186,7 +186,7 @@ class TestMessageRepository:
                     message_id=f"count-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)
@@ -205,7 +205,7 @@ class TestMessageRepository:
                     message_id=f"count-filter-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user" if i < 2 else "system"
                 )
                 message_repository.save(message)
@@ -227,7 +227,7 @@ class TestMessageRepository:
                 message_id="test-delete",
                 session_id="test-session",
                 content="Contenido a eliminar",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                 sender="user"
             )
             message_repository.save(message)
@@ -259,7 +259,7 @@ class TestMessageRepository:
                     message_id=f"session-msg-{i}",
                     session_id=session_id,
                     content=f"Contenido {i}",
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),  # <-- CORREGIDO
                     sender="user"
                 )
                 message_repository.save(message)
