@@ -43,13 +43,13 @@ class MessageOutputSchema(Schema):
 class MessageResponseSchema(Schema):
     """Esquema para respuestas exitosas."""
     
-    status = fields.Str(default='success')
+    status = fields.Str(dump_default='success')
     data = fields.Nested(MessageOutputSchema)
 
 class MessageListResponseSchema(Schema):
     """Esquema para respuestas de lista de mensajes."""
     
-    status = fields.Str(default='success')
+    status = fields.Str(dump_default='success')
     data = fields.List(fields.Nested(MessageOutputSchema))
     pagination = fields.Dict()
 
@@ -63,7 +63,7 @@ class ErrorDetailSchema(Schema):
 class ErrorResponseSchema(Schema):
     """Esquema para respuestas de error."""
     
-    status = fields.Str(default='error')
+    status = fields.Str(dump_default='error')
     error = fields.Nested(ErrorDetailSchema)
 
 # Instancias de esquemas para reutilizar
