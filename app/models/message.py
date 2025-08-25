@@ -133,3 +133,37 @@ class Message(db.Model):
             query = query.filter_by(sender=sender)
         
         return query.count()
+    
+    @classmethod
+    def search_globally(cls, query: str, limit: int, offset: int) -> list:
+        """
+        Realiza una búsqueda global de mensajes paginada.
+
+        Args:
+            query: El texto a buscar en el contenido.
+            limit: El número de resultados a devolver.
+            offset: El desplazamiento para la paginación.
+
+        Returns:
+            list: Una lista de objetos Message.
+        """
+        search_term = f"%{query.lower()}%"
+        return cls.query.filter(cls.content.ilike(search_term))\
+                        .order_by(cls.timestamp.desc())\
+                        .offset(offset)\
+                        .limit(limit)\
+                        .all()
+
+    @classmethod
+    def count_global_search_results(cls, query: str) -> int:
+        """
+        Cuenta el total de resultados para una búsqueda global.
+
+        Args:
+            query: El texto a buscar en el contenido.
+
+        Returns:
+            int: El número total de mensajes que coinciden.
+        """
+        search_term = f"%{query.lower()}%"
+        return cls.query.filter(cls.content.ilike(search_term)).count()

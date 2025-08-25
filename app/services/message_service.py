@@ -204,3 +204,46 @@ class MessageService:
             'user_messages': user_messages,
             'system_messages': system_messages
         }
+    
+    def search_messages_globally(self, query: str, limit: int, offset: int) -> Dict[str, Any]:
+        """
+        Busca mensajes globalmente y devuelve resultados paginados.
+        
+        Args:
+            query: Texto de búsqueda.
+            limit: Límite de resultados por página.
+            offset: Desplazamiento.
+            
+        Returns:
+            Dict: Un diccionario con los mensajes y datos de paginación.
+            
+        Raises:
+            ValidationError: Si la consulta es inválida.
+        """
+        # Validar la consulta de búsqueda
+        if not query or len(query.strip()) < 3:
+            raise ValidationError(
+                "La consulta de búsqueda debe tener al menos 3 caracteres.",
+                code="SEARCH_QUERY_TOO_SHORT"
+            )
+        
+        # Validar y normalizar parámetros de paginación
+        limit, offset = PaginationValidator.validate_pagination_params(
+            limit, offset, max_limit=100
+        )
+
+        messages, total_results = self.message_repository.search_globally(
+            query, limit, offset
+        )
+
+        next_offset = offset + limit if (offset + limit) < total_results else None
+
+        return {
+            "data": [msg.to_dict() for msg in messages],
+            "pagination": {
+                "total_results": total_results,
+                "limit": limit,
+                "offset": offset,
+                "next_offset": next_offset
+            }
+        }

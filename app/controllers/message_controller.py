@@ -47,6 +47,7 @@ class MessageController:
         self.blueprint.route('/messages/<session_id>', methods=['GET'])(self.get_messages_by_session)
         self.blueprint.route('/message/<message_id>', methods=['GET'])(self.get_message_by_id)
         self.blueprint.route('/sessions/<session_id>/stats', methods=['GET'])(self.get_session_stats)
+        self.blueprint.route('/messages/search/all', methods=['GET'])(self.search_messages_globally)  # Esta línea es crucial
     
     def create_message(self) -> Tuple[dict, int]:
         """
@@ -273,17 +274,6 @@ class MessageController:
             }
         }
         
-    def _register_routes(self):
-        """Registra las rutas del controlador."""
-        # Ruta para crear un mensaje
-        self.blueprint.route('/messages', methods=['POST'])(self.create_message)
-        
-        # Ruta para obtener mensajes por session_id
-        self.blueprint.route('/messages/<session_id>', methods=['GET'])(self.get_messages_by_session)
-        
-        # NUEVO: Ruta para obtener un solo mensaje por message_id
-        self.blueprint.route('/message/<message_id>', methods=['GET'])(self.get_message_by_id)
-        
         # Ruta para obtener estadísticas de una sesión
         self.blueprint.route('/messages/stats/<session_id>', methods=['GET'])(self.get_session_stats)
     def get_message_by_id(self, message_id: str):
@@ -303,6 +293,31 @@ class MessageController:
             return self._error_response(e.code, e.message), 404
         except Exception as e:
             print(f"Error inesperado en get_message_by_id: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return self._error_response(
+                "INTERNAL_ERROR",
+                f"Error interno del servidor: {str(e)}"
+            ), 500
+    
+    def search_messages_globally(self) -> Tuple[dict, int]:
+        """Maneja la petición GET para buscar mensajes por contenido en todas las sesiones."""
+        try:
+            query = request.args.get('query')
+            
+            # Obtener parámetros de paginación
+            limit = int(request.args.get('limit', 10))
+            offset = int(request.args.get('offset', 0))
+
+            # Obtener resultados del servicio
+            results = self.message_service.search_messages_globally(query, limit, offset)
+            
+            # Serializar y devolver la respuesta
+            return message_list_response_schema.dump(results), 200
+
+        except ValidationError as e:
+            return self._error_response(e.code, e.message, e.details), 400
+        except Exception as e:
+            print(f"Error inesperado en search_messages_globally: {str(e)}")
             print(f"Traceback: {traceback.format_exc()}")
             return self._error_response(
                 "INTERNAL_ERROR",

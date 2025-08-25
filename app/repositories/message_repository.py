@@ -166,3 +166,22 @@ class MessageRepository:
             
         except SQLAlchemyError as e:
             raise DatabaseError(f"Error al obtener session_ids: {str(e)}")
+    
+    def search_globally(self, query: str, limit: int, offset: int) -> Tuple[List[Message], int]:
+        """
+        Realiza una búsqueda global paginada de mensajes en todas las sesiones.
+        
+        Args:
+            query: Texto a buscar.
+            limit: Límite de resultados.
+            offset: Desplazamiento de resultados.
+            
+        Returns:
+            Tuple: Una tupla con (lista de mensajes, total de resultados).
+        """
+        try:
+            messages = Message.search_globally(query, limit, offset)
+            total_results = Message.count_global_search_results(query)
+            return messages, total_results
+        except SQLAlchemyError as e:
+            raise DatabaseError(f"Error al buscar mensajes globalmente: {str(e)}")
