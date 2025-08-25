@@ -9,6 +9,7 @@ import json
 import traceback
 from werkzeug.exceptions import BadRequest
 from app.utils.auth import api_key_required
+from app.controllers.realtime_controller import broadcast_new_message
 
 from app.services.message_service import MessageService
 from app.schemas.message_schema import (
@@ -89,6 +90,8 @@ class MessageController:
             processed_message = self.message_service.process_message(validated_data)
             
             # 5. Preparar respuesta exitosa
+            # Transmitir el nuevo mensaje a través del WebSocket
+            broadcast_new_message(processed_message)
             response_data = {
                 'status': 'success',
                 'data': processed_message

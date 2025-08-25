@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SocketIO Test Client</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <h1>Cliente de prueba WebSocket</h1>
+    <p>Abre la consola del navegador (F12) para ver los eventos.</p>
+    <p>Envía un POST a la API para ver los mensajes en tiempo real.</p>
+    <ul id="messages"></ul>
+
+    <script>
+        // Conectar al servidor de SocketIO
+        const socket = io('http://localhost:5000');
+
+        // Evento de conexión
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        // Evento de desconexión
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor');
+        });
+
+        // Escuchar el evento 'new_message'
+        socket.on('new_message', (data) => {
+            console.log('Nuevo mensaje recibido:', data);
+            const item = document.createElement('li');
+            item.textContent = JSON.stringify(data, null, 2);
+            document.getElementById('messages').appendChild(item);
+        });
+    </script>
+</body>
+</html>
