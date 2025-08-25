@@ -7,6 +7,7 @@ from marshmallow import ValidationError as MarshmallowValidationError
 from typing import Tuple
 import json
 import traceback
+from app import limiter
 from werkzeug.exceptions import BadRequest
 from app.utils.auth import api_key_required
 from app.controllers.realtime_controller import broadcast_new_message
@@ -43,11 +44,11 @@ class MessageController:
     
     def _register_routes(self):
         """Registra las rutas del controlador."""
-        self.blueprint.route('/messages', methods=['POST'])(self.create_message)
+        self.blueprint.route('/messages', methods=['POST'])(limiter.limit("100 per hour")(self.create_message))
         self.blueprint.route('/messages/<session_id>', methods=['GET'])(self.get_messages_by_session)
         self.blueprint.route('/message/<message_id>', methods=['GET'])(self.get_message_by_id)
         self.blueprint.route('/sessions/<session_id>/stats', methods=['GET'])(self.get_session_stats)
-        self.blueprint.route('/messages/search/all', methods=['GET'])(self.search_messages_globally)  # Esta línea es crucial
+        self.blueprint.route('/messages/search/all', methods=['GET'])(self.search_messages_globally) 
     
     def create_message(self) -> Tuple[dict, int]:
         """

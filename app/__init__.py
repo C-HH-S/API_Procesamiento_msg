@@ -9,9 +9,17 @@ from app.models.message import db
 from app.repositories.message_repository import MessageRepository
 from app.services.message_service import MessageService
 from app.utils.exceptions import MessageProcessingError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Instancia global de SocketIO, para que otros módulos puedan importarla
 socketio = SocketIO(cors_allowed_origins="*")
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=None, # No se aplicará el límite por defecto a todas las rutas.
+    storage_uri="memory://"
+)
 
 def create_app(config_name=None):
     """
@@ -29,6 +37,8 @@ def create_app(config_name=None):
     
     db.init_app(app)
     socketio.init_app(app)
+     # Inicializar la extensión Limiter con la app
+    limiter.init_app(app)
     
     from app.controllers.message_controller import MessageController
     from app.controllers.realtime_controller import broadcast_new_message, handle_connect, handle_disconnect

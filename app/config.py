@@ -28,6 +28,8 @@ class Config:
     INAPPROPRIATE_WORDS = [
         'spam', 'malware', 'virus', 'hack', 'phishing'
     ]
+    
+    RATELIMIT_DEFAULT = "100 per hour"
 
 class DevelopmentConfig(Config):
     """Configuración para desarrollo."""
