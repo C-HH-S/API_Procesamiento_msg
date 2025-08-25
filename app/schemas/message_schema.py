@@ -1,25 +1,40 @@
 """
-Esquemas de serialización para la API - Versión simplificada.
+Esquemas de serialización para la API
 Este módulo define los esquemas de validación y serialización usando Marshmallow.
 """
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, validates_schema, ValidationError
+from datetime import datetime
 
 class MessageInputSchema(Schema):
     """Esquema para validar entrada de mensajes."""
     
-    # message_id es opcional, se genera automáticamente si no se proporciona
-    message_id = fields.Str(validate=validate.Length(min=1, max=255), allow_none=True, missing=None)
+    # Todos los campos son ahora obligatorios
+    message_id = fields.Str(required=True, validate=validate.Length(min=1, max=255))
     session_id = fields.Str(required=True, validate=validate.Length(min=1, max=255))
     content = fields.Str(required=True, validate=validate.Length(min=1, max=5000))
     sender = fields.Str(required=True, validate=validate.OneOf(['user', 'system']))
-    # timestamp es opcional, se genera automáticamente si no se proporciona
-    timestamp = fields.Str(allow_none=True, missing=None)
+    timestamp = fields.Str(required=True)
+    
+    @validates_schema
+    def validate_timestamp(self, data, **kwargs):
+        """Valida que el timestamp sea un formato ISO válido."""
+        timestamp_str = data.get('timestamp', '')
+        if not timestamp_str:
+            raise ValidationError("timestamp es requerido")
+        
+        try:
+            datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            raise ValidationError("timestamp debe estar en formato ISO 8601 (ej: 2023-06-15T14:30:00Z)")
+
 
 class MessageMetadataSchema(Schema):
     """Esquema para metadatos del mensaje."""
     
-    word_count = fields.Int()
-    character_count = fields.Int()
+    word_count = fields.Int(dump_only=True)
+    character_count = fields.Int(dump_only=True)
+    processed_at = fields.Str(dump_only=True)
+    updated_at = fields.Str(dump_only=True)
 
 class MessageOutputSchema(Schema):
     """Esquema para salida de mensajes."""

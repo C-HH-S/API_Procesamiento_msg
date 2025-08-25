@@ -6,6 +6,7 @@ import os
 import sys
 import eventlet
 from app import create_app, socketio
+from app.models.message import db
 
 # Configurar encoding para Windows
 if sys.platform.startswith('win'):
@@ -27,7 +28,8 @@ if __name__ == '__main__':
     host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_PORT', 5000))
     debug_mode = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
-
+    with app.app_context():
+        db.create_all()
     print("🚀 Iniciando Message Processing API con SocketIO")
     print(f"📍 Servidor: http://{host}:{port}")
     print(f"🔧 Modo debug: {debug_mode}")

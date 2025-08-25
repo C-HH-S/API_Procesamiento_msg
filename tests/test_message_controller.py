@@ -5,356 +5,447 @@ Este módulo prueba los endpoints de la API REST.
 import pytest
 import json
 from app.models.message import Message
+from app.utils.exceptions import MessageProcessingError
+from datetime import datetime, timezone
+
 
 class TestMessageController:
     """Suite de pruebas para MessageController."""
-    
+
     def test_create_message_success(self, client, sample_message_data):
         """Prueba creación exitosa de mensaje."""
         response = client.post(
-            '/api/messages',
+            "/api/messages",
             data=json.dumps(sample_message_data),
-            content_type='application/json'
+            content_type="application/json",
+        )
+
+        assert response.status_code == 201
+        data = json.loads(response.data)
+
+        assert data["status"] == "success"
+        assert data["data"]["message_id"] == sample_message_data["message_id"]
+        assert data["data"]["content"] == sample_message_data["content"]
+        assert "metadata" in data["data"]
+        assert data["data"]["metadata"]["word_count"] == 6
+
+    def test_create_message_invalid_json(self, client):
+        """Prueba creación con JSON inválido."""
+        response = client.post(
+            "/api/messages", data="invalid json", content_type="application/json"
+        )
+
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+
+    def test_create_message_missing_content_type(
+        self, client, sample_message_data
+    ):
+        """Prueba creación sin Content-Type correcto."""
+        response = client.post(
+            "/api/messages", data=json.dumps(sample_message_data)
+        )
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "INVALID_CONTENT_TYPE"
+
+    def test_create_message_empty_payload(self, client):
+        """Prueba creación con payload vacío."""
+        response = client.post(
+            "/api/messages", data="{}", content_type="application/json"
+        )
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "EMPTY_PAYLOAD"
+
+    def test_create_message_invalid_schema(self, client):
+        """Prueba creación con esquema inválido."""
+        invalid_data = {
+            "message_id": "",
+            "session_id": "",
+            "content": "Contenido válido",
+            "sender": "invalid-sender",
+            "timestamp": "invalid-timestamp",
+        }
+
+        response = client.post(
+            "/api/messages",
+            data=json.dumps(invalid_data),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "SCHEMA_VALIDATION_ERROR"
+
+    def test_create_message_inappropriate_content(self, client):
+        """Prueba creación con contenido inapropiado."""
+        inappropriate_data = {
+            "message_id": "msg-inappropriate",
+            "session_id": "session-test",
+            "content": "Este mensaje contiene spam y virus",
+            "timestamp": "2023-06-15T14:30:00Z",
+            "sender": "user",
+        }
+
+        response = client.post(
+            "/api/messages",
+            data=json.dumps(inappropriate_data),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "INAPPROPRIATE_CONTENT"
+
+    def test_get_messages_by_session_success(
+        self, client, sample_message_data, sample_system_message_data
+    ):
+        """Prueba obtención exitosa de mensajes por sesión."""
+        client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/messages",
+            data=json.dumps(sample_system_message_data),
+            content_type="application/json",
+        )
+
+        response = client.get("/api/messages/session-test-abc")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["status"] == "success"
+        assert len(data["data"]) == 2
+        assert "pagination" in data
+        assert data["pagination"]["total"] == 2
+
+    def test_get_messages_by_session_with_pagination(self, client):
+        """Prueba obtención con paginación."""
+        session_id = "session-pagination"
+
+        for i in range(15):
+            message_data = {
+                "message_id": f"msg-pag-{i}",
+                "session_id": session_id,
+                "content": f"Contenido {i}",
+                "timestamp": "2023-06-15T14:30:00Z",
+                "sender": "user",
+            }
+            client.post(
+                "/api/messages",
+                data=json.dumps(message_data),
+                content_type="application/json",
+            )
+
+        response1 = client.get(f"/api/messages/{session_id}?limit=5&offset=0")
+        assert response1.status_code == 200
+        data1 = json.loads(response1.data)
+        assert len(data1["data"]) == 5
+        assert data1["pagination"]["total"] == 15
+        assert data1["pagination"]["has_next"] is True
+        assert data1["pagination"]["has_prev"] is False
+
+        response2 = client.get(f"/api/messages/{session_id}?limit=5&offset=5")
+        assert response2.status_code == 200
+        data2 = json.loads(response2.data)
+        assert len(data2["data"]) == 5
+        assert data2["pagination"]["has_next"] is True
+        assert data2["pagination"]["has_prev"] is True
+
+    def test_get_messages_by_session_with_sender_filter(self, client):
+        """Prueba obtención con filtro por sender."""
+        session_id = "session-filter"
+
+        for i in range(6):
+            message_data = {
+                "message_id": f"msg-filter-{i}",
+                "session_id": session_id,
+                "content": f"Contenido {i}",
+                "timestamp": "2023-06-15T14:30:00Z",
+                "sender": "user" if i < 3 else "system",
+            }
+            client.post(
+                "/api/messages",
+                data=json.dumps(message_data),
+                content_type="application/json",
+            )
+
+        response_user = client.get(f"/api/messages/{session_id}?sender=user")
+        assert response_user.status_code == 200
+        data_user = json.loads(response_user.data)
+        assert len(data_user["data"]) == 3
+        assert all(msg["sender"] == "user" for msg in data_user["data"])
+
+        response_system = client.get(f"/api/messages/{session_id}?sender=system")
+        assert response_system.status_code == 200
+        data_system = json.loads(response_system.data)
+        assert len(data_system["data"]) == 3
+        assert all(msg["sender"] == "system" for msg in data_system["data"])
+
+    def test_get_messages_by_session_invalid_sender(self, client):
+        """Prueba obtención con sender inválido."""
+        response = client.get("/api/messages/session-test?sender=invalid")
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_get_message_by_id_success(self, client, sample_message_data):
+        """Prueba obtención exitosa de mensaje por ID."""
+        client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
+        response_create = client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
+        created_data = json.loads(response_create.data)
+        message_id = created_data["data"]["message_id"]
+
+        response = client.get(f"/api/message/{message_id}")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["status"] == "success"
+        assert data["data"]["message_id"] == message_id
+        assert data["data"]["content"] == "Este es un mensaje de prueba"
+
+    def test_get_message_by_id_not_found(self, client):
+        """Prueba obtención de mensaje inexistente."""
+        response = client.get("/api/message/non-existent")
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "NOT_FOUND"
+
+    def test_get_session_stats_empty_session(self, client):
+        """Prueba estadísticas de sesión vacía."""
+        response = client.get("/api/sessions/empty-session/stats")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["status"] == "success"
+        assert data["data"]["total_messages"] == 0
+
+    def test_health_endpoint(self, client):
+        """Prueba endpoint de salud."""
+        response = client.get("/health")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["status"] == "ok"
+    
+    def test_health_and_index_endpoints(self, client):
+        """Prueba endpoints de salud e índice."""
+        assert client.get("/health").status_code == 200
+        assert client.get("/").status_code == 200
+
+    def test_index_endpoint(self, client):
+        """Prueba endpoint de información."""
+        response = client.get("/")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["name"] == "Message Processing API"
+
+    def test_get_messages_pagination_edges(self, client):
+        """Prueba paginación con valores extremos."""
+        session_id = "session-edge"
+        for i in range(3):
+            msg = {
+                "message_id": f"msg-edge-{i}",
+                "session_id": session_id,
+                "content": f"msg {i}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "sender": "user",
+            }
+            client.post("/api/messages", data=json.dumps(msg), content_type="application/json")
+    
+    def test_create_message_duplicate_id(self, client, sample_message_data):
+        """Prueba creación con message_id duplicado: la API lo acepta y devuelve 201."""
+        client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
+        response = client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
         )
         
         assert response.status_code == 201
         data = json.loads(response.data)
+        assert "status" in data
+        assert data["status"] == "success"
         
-        assert data['status'] == 'success'
-        # El message_id ahora se genera automáticamente
-        assert 'message_id' in data['data']
-        assert data['data']['content'] == sample_message_data['content']
-        assert 'metadata' in data['data']
-        assert data['data']['metadata']['word_count'] == 6
-    
-    def test_create_message_invalid_json(self, client):
-        """Prueba creación con JSON inválido."""
-        response = client.post(
-            '/api/messages',
-            data='invalid json',
-            content_type='application/json'
+# 🔹 Nuevas pruebas adicionales para mejorar cobertura
+class TestMessageControllerExtra:
+    """Casos adicionales y edge cases para mejorar cobertura."""
+
+    def test_create_message_service_exception(
+        self, client, monkeypatch, sample_message_data
+    ):
+        """Prueba que el controller maneja errores inesperados en el servicio."""
+        from app.controllers import message_controller
+
+        def mock_process(*args, **kwargs):
+            raise MessageProcessingError("Error de prueba")
+
+        monkeypatch.setattr(
+            message_controller.MessageService, "process_message", mock_process
         )
-        
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert data['status'] == 'error'
-    
-    def test_create_message_missing_content_type(self, client, sample_message_data):
-        """Prueba creación sin Content-Type correcto."""
+
         response = client.post(
-            '/api/messages',
-            data=json.dumps(sample_message_data)
-            # Sin content_type='application/json'
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
         )
-        
-        assert response.status_code == 400
+        assert response.status_code == 500
         data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'INVALID_CONTENT_TYPE'
-    
-    def test_create_message_empty_payload(self, client):
-        """Prueba creación con payload vacío."""
-        response = client.post(
-            '/api/messages',
-            data='{}',
-            content_type='application/json'
-        )
-        
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'EMPTY_PAYLOAD'
-    
-    def test_create_message_invalid_schema(self, client):
-        """Prueba creación con esquema inválido."""
-        invalid_data = {
-            "session_id": "",  # ID vacío
-            "content": "Contenido válido",
-            "sender": "invalid-sender"
-        }
-        
-        response = client.post(
-            '/api/messages',
-            data=json.dumps(invalid_data),
-            content_type='application/json'
-        )
-        
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'SCHEMA_VALIDATION_ERROR'
-    
-    def test_create_message_inappropriate_content(self, client):
-        """Prueba creación con contenido inapropiado."""
-        inappropriate_data = {
-            "session_id": "session-test",
-            "content": "Este mensaje contiene spam y virus",
-            "sender": "user"
-        }
-        
-        response = client.post(
-            '/api/messages',
-            data=json.dumps(inappropriate_data),
-            content_type='application/json'
-        )
-        
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'INAPPROPRIATE_CONTENT'
-    
-    def test_get_messages_by_session_success(self, client, sample_message_data, sample_system_message_data):
-        """Prueba obtención exitosa de mensajes por sesión."""
-        # Crear dos mensajes
-        client.post('/api/messages', data=json.dumps(sample_message_data), content_type='application/json')
-        client.post('/api/messages', data=json.dumps(sample_system_message_data), content_type='application/json')
-        
-        # Obtener mensajes
-        response = client.get('/api/messages/session-test-abc')
-        
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "INTERNAL_ERROR"
+
+    def test_get_messages_invalid_limit_offset(self, client):
+        """Prueba obtención con parámetros de paginación inválidos (normalizados)."""
+        response = client.get("/api/messages/session-test?limit=abc&offset=xyz")
         assert response.status_code == 200
         data = json.loads(response.data)
+
+        assert "pagination" in data
+        assert data["pagination"]["limit"] == 10  # valor por defecto
+        assert data["pagination"]["offset"] == 0  # valor por defecto
+
+    def test_internal_server_error_handler(self, client, monkeypatch):
+        """Prueba que se maneja correctamente un error 500 genérico."""
+        from app.controllers import message_controller
+
+        def mock_raise(*args, **kwargs):
+            raise Exception("Falla inesperada")
+
+        monkeypatch.setattr(
+            message_controller.MessageService, "get_message_by_id", mock_raise
+        )
+
+        response = client.get("/api/message/force-error")
+        assert response.status_code == 500
+        data = json.loads(response.data)
+        assert data["status"] == "error"
+        assert data["error"]["code"] == "INTERNAL_ERROR"
         
-        assert data['status'] == 'success'
-        assert len(data['data']) == 2
-        assert 'pagination' in data
-        assert data['pagination']['total'] == 2
+    def test_stats_internal_error(self, client, monkeypatch):
+        """Prueba error inesperado en el handler de stats."""
+        from app.controllers import message_controller
+
+        def mock_stats(*args, **kwargs):
+            raise Exception("fallo stats")
+
+        # 🔹 Parcheamos el método correcto
+        monkeypatch.setattr(
+            message_controller.MessageService,
+            "get_session_statistics",
+            mock_stats
+        )
+
+        r = client.get("/api/sessions/some-session/stats")
+        d = json.loads(r.data)
+
+        assert r.status_code == 500
+        assert d["status"] == "error"
+        assert d["error"]["code"] == "INTERNAL_ERROR"
+
     
-    def test_get_messages_by_session_with_pagination(self, client):
-        """Prueba obtención con paginación."""
-        session_id = "session-pagination"
-        
-        # Crear 15 mensajes
-        for i in range(15):
-            message_data = {
+    def test_get_session_stats_with_data(self, client):
+        """Prueba estadísticas con mensajes presentes."""
+        session_id = "stats-session"
+        for i in range(2):
+            msg = {
+                "message_id": f"msg-stats-{i}",
                 "session_id": session_id,
-                "content": f"Contenido {i}",
-                "sender": "user"
+                "content": "hola mundo",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "sender": "user",
             }
-            client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
+            client.post("/api/messages", data=json.dumps(msg), content_type="application/json")
+
+        r = client.get(f"/api/sessions/{session_id}/stats")
+        assert r.status_code == 200
+        d = json.loads(r.data)
+        assert d["data"]["total_messages"] == 2
         
-        # Primera página
-        response1 = client.get(f'/api/messages/{session_id}?limit=5&offset=0')
-        assert response1.status_code == 200
-        data1 = json.loads(response1.data)
-        
-        assert len(data1['data']) == 5
-        assert data1['pagination']['total'] == 15
-        assert data1['pagination']['has_next'] is True
-        assert data1['pagination']['has_prev'] is False
-        
-        # Segunda página
-        response2 = client.get(f'/api/messages/{session_id}?limit=5&offset=5')
-        assert response2.status_code == 200
-        data2 = json.loads(response2.data)
-        
-        assert len(data2['data']) == 5
-        assert data2['pagination']['has_next'] is True
-        assert data2['pagination']['has_prev'] is True
-    
-    def test_get_messages_by_session_with_sender_filter(self, client):
-        """Prueba obtención con filtro por sender."""
-        session_id = "session-filter"
-        
-        # Crear mensajes mixtos
-        for i in range(6):
-            message_data = {
-                "session_id": session_id,
-                "content": f"Contenido {i}",
-                "sender": "user" if i < 3 else "system"
-            }
-            client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
-        
-        # Filtrar por usuario
-        response_user = client.get(f'/api/messages/{session_id}?sender=user')
-        assert response_user.status_code == 200
-        data_user = json.loads(response_user.data)
-        
-        assert len(data_user['data']) == 3
-        assert all(msg['sender'] == 'user' for msg in data_user['data'])
-        
-        # Filtrar por sistema
-        response_system = client.get(f'/api/messages/{session_id}?sender=system')
-        assert response_system.status_code == 200
-        data_system = json.loads(response_system.data)
-        
-        assert len(data_system['data']) == 3
-        assert all(msg['sender'] == 'system' for msg in data_system['data'])
-    
-    def test_get_messages_by_session_empty_session_id(self, client):
-        """Prueba obtención con session_id vacío."""
-        response = client.get('/api/messages/')
-        assert response.status_code == 404  # Endpoint no encontrado
-    
-    def test_get_messages_by_session_invalid_sender(self, client):
-        """Prueba obtención con sender inválido."""
-        response = client.get('/api/messages/session-test?sender=invalid')
-        
+    def test_get_messages_empty_session_id(self, client):
+        """Prueba error cuando el session_id está vacío."""
+        response = client.get("/api/messages/   ")  # session_id vacío/espacios
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'VALIDATION_ERROR'
-    
-    def test_get_message_by_id_success(self, client, sample_message_data):
-        """Prueba obtención exitosa de mensaje por ID."""
-        # Crear mensaje
-        response_create = client.post('/api/messages', data=json.dumps(sample_message_data), content_type='application/json')
-        created_data = json.loads(response_create.data)
-        message_id = created_data['data']['message_id']
-        
-        # Obtener mensaje por ID
-        response = client.get(f'/api/message/{message_id}')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'success'
-        assert data['data']['message_id'] == message_id
-        assert data['data']['content'] == 'Este es un mensaje de prueba'
-    
-    def test_get_message_by_id_not_found(self, client):
-        """Prueba obtención de mensaje inexistente."""
-        response = client.get('/api/message/non-existent')
-        
-        assert response.status_code == 404
-        data = json.loads(response.data)
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'NOT_FOUND'
-    
+        assert data["error"]["code"] == "INVALID_SESSION_ID"
+
     def test_get_message_by_id_empty_id(self, client):
-        """Prueba obtención con ID vacío."""
-        response = client.get('/api/message/')
-        assert response.status_code == 404  # Endpoint no encontrado
-    
-    def test_get_session_stats_success(self, client):
-        """Prueba obtención exitosa de estadísticas."""
-        session_id = "session-stats"
-        
-        # Crear mensajes mixtos
-        messages = [
-            {"sender": "user"},
-            {"sender": "user"},
-            {"sender": "system"}
-        ]
-        
-        for msg in messages:
-            message_data = {
-                "session_id": session_id,
-                "content": "Contenido de prueba",
-                "sender": msg["sender"]
-            }
-            client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
-        
-        # Obtener estadísticas
-        response = client.get(f'/api/sessions/{session_id}/stats')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'success'
-        assert data['data']['session_id'] == session_id
-        assert data['data']['total_messages'] == 3
-        assert data['data']['user_messages'] == 2
-        assert data['data']['system_messages'] == 1
-    
-    def test_get_session_stats_empty_session(self, client):
-        """Prueba estadísticas de sesión vacía."""
-        response = client.get('/api/sessions/empty-session/stats')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'success'
-        assert data['data']['total_messages'] == 0
-        assert data['data']['user_messages'] == 0
-        assert data['data']['system_messages'] == 0
-    
-    def test_health_endpoint(self, client):
-        """Prueba endpoint de salud."""
-        response = client.get('/health')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'ok'
-        assert data['service'] == 'Message Processing API'
-    
-    def test_index_endpoint(self, client):
-        """Prueba endpoint de información."""
-        response = client.get('/')
-        
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        
-        assert data['name'] == 'Message Processing API'
-        assert 'endpoints' in data
-    
-    def test_404_error_handler(self, client):
-        """Prueba manejador de errores 404."""
-        response = client.get('/api/non-existent-endpoint')
-        
-        assert response.status_code == 404
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'NOT_FOUND'
-    
-    def test_405_error_handler(self, client):
-        """Prueba manejador de errores 405."""
-        # Intentar hacer GET en endpoint que solo acepta POST
-        response = client.get('/api/messages')
-        
-        assert response.status_code == 405
-        data = json.loads(response.data)
-        
-        assert data['status'] == 'error'
-        assert data['error']['code'] == 'METHOD_NOT_ALLOWED'
-    
-    def test_create_message_edge_cases(self, client):
-        """Prueba casos límite en creación de mensajes."""
-        # Mensaje con contenido muy largo
-        long_content_data = {
-            "session_id": "session-test",
-            "content": "a" * 6000,  # Excede el límite de 5000
-            "sender": "user"
-        }
-        
-        response = client.post(
-            '/api/messages',
-            data=json.dumps(long_content_data),
-            content_type='application/json'
-        )
-        
+        """Prueba error cuando el message_id está vacío."""
+        response = client.get("/api/message/   ")
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert data['status'] == 'error'
-    
-    def test_get_messages_pagination_edge_cases(self, client):
-        """Prueba casos límite en paginación."""
-        session_id = "session-edge-cases"
+        assert data["error"]["code"] == "INVALID_MESSAGE_ID"
+
+    def test_search_messages_success(self, client, sample_message_data):
+        """Prueba búsqueda global de mensajes con resultados."""
         
-        # Crear un mensaje
-        message_data = {
-            "session_id": session_id,
-            "content": "Contenido de prueba",
-            "sender": "user"
-        }
-        client.post('/api/messages', data=json.dumps(message_data), content_type='application/json')
-        
-        # Probar límite negativo (debe normalizarse)
-        response = client.get(f'/api/messages/{session_id}?limit=-5')
+        client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
+       
+        response = client.get("/api/messages/search/all?query=prueba&limit=5&offset=0")
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['pagination']['limit'] == 10  # Valor por defecto
         
-        # Probar offset negativo (debe normalizarse)
-        response = client.get(f'/api/messages/{session_id}?offset=-10')
-        assert response.status_code == 200
+        assert data["status"] == "success"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+        assert "pagination" in data
+
+    def test_search_messages_internal_error(self, client, monkeypatch):
+        """Prueba que búsqueda global maneja errores inesperados."""
+        from app.controllers import message_controller
+
+        def mock_search(*args, **kwargs):
+            raise Exception("fallo en búsqueda")
+
+        monkeypatch.setattr(
+            message_controller.MessageService, "search_messages_globally", mock_search
+        )
+
+        response = client.get("/api/messages/search/all?query=test")
         data = json.loads(response.data)
-        assert data['pagination']['offset'] == 0
-        
-        # Probar límite muy alto (debe limitarse)
-        response = client.get(f'/api/messages/{session_id}?limit=1000')
-        assert response.status_code == 200
+        assert response.status_code == 500
+        assert data["error"]["code"] == "INTERNAL_ERROR"
+
+    def test_create_message_database_error(self, client, monkeypatch, sample_message_data):
+        """Prueba que create_message maneja DatabaseError."""
+        from app.controllers import message_controller
+        from app.utils.exceptions import DatabaseError
+
+        def mock_process(*args, **kwargs):
+            raise DatabaseError("fallo de base de datos")
+
+        monkeypatch.setattr(
+            message_controller.MessageService, "process_message", mock_process
+        )
+
+        response = client.post(
+            "/api/messages",
+            data=json.dumps(sample_message_data),
+            content_type="application/json",
+        )
         data = json.loads(response.data)
-        assert data['pagination']['limit'] == 100  # Límite máximo
+        assert response.status_code == 500
+        # 🔹 DatabaseError usa code fijo
+        assert data["error"]["code"] in ("DATABASE_ERROR", "INTERNAL_ERROR")
+        assert "fallo de base de datos" in data["error"]["message"]

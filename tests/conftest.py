@@ -54,27 +54,43 @@ def message_service(app, message_repository):
 
 @pytest.fixture
 def sample_message_data():
-    """Fixture con datos de mensaje de prueba válidos."""
+    """Fixture con datos de mensaje de prueba válidos - TODOS los campos obligatorios."""
     return {
+        "message_id": "msg-test-123",
         "session_id": "session-test-abc",
         "content": "Este es un mensaje de prueba",
+        "timestamp": "2023-06-15T14:30:00Z",
         "sender": "user"
     }
 
 @pytest.fixture
 def sample_system_message_data():
-    """Fixture con datos de mensaje del sistema."""
+    """Fixture con datos de mensaje del sistema - TODOS los campos obligatorios."""
     return {
+        "message_id": "msg-system-456",
         "session_id": "session-test-abc",
         "content": "Respuesta del sistema automática",
+        "timestamp": "2023-06-15T14:30:05Z",
         "sender": "system"
     }
 
 @pytest.fixture
 def invalid_message_data():
-    """Fixture con datos de mensaje inválidos."""
+    """Fixture con datos de mensaje inválidos - campos faltantes o vacíos."""
     return {
+        "message_id": "",  # ID vacío
         "session_id": "",  # session_id vacío
         "content": "",  # Contenido vacío
+        "timestamp": "invalid-date",  # Fecha inválida
         "sender": "invalid"  # Sender inválido
+    }
+
+@pytest.fixture
+def incomplete_message_data():
+    """Fixture con datos de mensaje incompletos - faltan campos obligatorios."""
+    return {
+        "message_id": "msg-incomplete",
+        "session_id": "session-test",
+        "content": "Mensaje incompleto"
+        # Faltan timestamp y sender obligatorios
     }

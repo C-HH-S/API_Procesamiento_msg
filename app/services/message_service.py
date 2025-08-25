@@ -4,6 +4,7 @@ Este módulo contiene toda la lógica de negocio para el manejo de mensajes.
 """
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime, timezone
+import logging
 
 from app.models.message import Message
 from app.repositories.message_repository import MessageRepository
@@ -35,10 +36,9 @@ class MessageService:
             Dict: Mensaje procesado con metadatos
             
         Raises:
-            ValidationError: Si los datos son inválidos
+            ValidationError: Si la validación falla
             InvalidFormatError: Si el formato es incorrecto
-            InappropriateContentError: Si contiene contenido inapropiado
-            MessageProcessingError: Si el message_id ya existe
+            InappropriateContentError: Si se encuentra contenido inapropiado
         """
         # 1. Validar campos básicos requeridos
         self._validate_basic_fields(message_data)
@@ -61,10 +61,11 @@ class MessageService:
         
         # 6. Retornar mensaje procesado
         return saved_message.to_dict()
+
     
-    def _validate_basic_fields(self, data: Dict[str, Any]) -> None:
+    def _validate_all_required_fields(self, data: Dict[str, Any]) -> None:
         """
-        Valida los campos básicos requeridos.
+        Valida todos los campos requeridos (ahora todos son obligatorios).
         
         Args:
             data: Diccionario con los datos del mensaje
@@ -73,9 +74,9 @@ class MessageService:
             ValidationError: Si faltan campos requeridos
             InvalidFormatError: Si el formato es inválido
         """
-        # Campos requeridos (sin message_id porque se genera automáticamente)
-        required_fields = ['session_id', 'content', 'sender']
-        missing_fields = [field for field in required_fields if field not in data or data[field] is None]
+        # Todos los campos son ahora requeridos
+        required_fields = ['message_id', 'session_id', 'content', 'timestamp', 'sender']
+        missing_fields = [field for field in required_fields if field not in data or data[field] is None or data[field] == ""]
         
         if missing_fields:
             raise ValidationError(
@@ -84,13 +85,11 @@ class MessageService:
             )
         
         # Validar tipos y formatos
+        MessageValidator.validate_message_id(data['message_id'])
         MessageValidator.validate_session_id(data['session_id'])
         MessageValidator.validate_content(data['content'])
+        MessageValidator.validate_timestamp(data['timestamp'])
         MessageValidator.validate_sender(data['sender'])
-        
-        # Validar message_id solo si se proporciona
-        if data.get('message_id'):
-            MessageValidator.validate_message_id(data['message_id'])
     
     def get_messages_by_session(
         self, 
@@ -167,19 +166,16 @@ class MessageService:
         Returns:
             Message: Instancia del mensaje
         """
-        # Parsear timestamp si se proporciona
-        timestamp = None
-        if message_data.get('timestamp'):
-            timestamp = MessageValidator.validate_timestamp(message_data['timestamp'])
+        # Parsear timestamp (ahora es obligatorio)
+        timestamp = MessageValidator.validate_timestamp(message_data['timestamp'])
         
-        # Crear mensaje (el constructor se encarga de generar automáticamente
-        # los campos que no se proporcionen)
+        # Crear mensaje con todos los campos proporcionados
         message = Message(
+            message_id=message_data['message_id'],
             session_id=message_data['session_id'],
             content=message_data['content'],
-            sender=message_data['sender'],
-            message_id=message_data.get('message_id'),  # Puede ser None
-            timestamp=timestamp  # Puede ser None
+            timestamp=timestamp,
+            sender=message_data['sender']
         )
         
         return message
@@ -247,3 +243,7 @@ class MessageService:
                 "next_offset": next_offset
             }
         }
+
+    def delete_message(self, message_id: str) -> bool:
+        """Elimina un mensaje por ID y retorna True si se eliminó, False si no se encontró."""
+        return self.message_repository.delete_by_message_id(message_id)

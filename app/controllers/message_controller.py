@@ -1,5 +1,5 @@
 """
-Controladores para la API de mensajes - Versión corregida.
+Controladores para la API de mensajes
 Este módulo maneja las peticiones HTTP y coordina las respuestas.
 """
 from flask import Blueprint, request, jsonify
@@ -100,6 +100,13 @@ class MessageController:
             }
             
             return response_data, 201
+        
+        except BadRequest as e:
+            # Captura específicamente los errores BadRequest de Flask/Werkzeug
+            return self._error_response(
+                "INVALID_JSON",
+                "JSON malformado en el cuerpo de la petición"
+            ), 400
         
         except ValidationError as e:
             return self._error_response(e.code, e.message, getattr(e, 'details', None)), e.status_code
@@ -275,30 +282,6 @@ class MessageController:
             }
         }
         
-        # Ruta para obtener estadísticas de una sesión
-        self.blueprint.route('/messages/stats/<session_id>', methods=['GET'])(self.get_session_stats)
-    def get_message_by_id(self, message_id: str):
-        """Maneja la petición GET para obtener un solo mensaje por su ID."""
-        try:
-            # 1. Obtener mensaje del servicio
-            message = self.message_service.get_message_by_id(message_id)
-
-            # 2. Serializar y devolver el mensaje
-            response_data = {
-                'status': 'success',
-                'data': message
-            }
-            return response_data, 200
-
-        except MessageNotFoundError as e:
-            return self._error_response(e.code, e.message), 404
-        except Exception as e:
-            print(f"Error inesperado en get_message_by_id: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            return self._error_response(
-                "INTERNAL_ERROR",
-                f"Error interno del servidor: {str(e)}"
-            ), 500
     
     def search_messages_globally(self) -> Tuple[dict, int]:
         """Maneja la petición GET para buscar mensajes por contenido en todas las sesiones."""

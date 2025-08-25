@@ -25,11 +25,14 @@ class MessageRepository:
         """
         try:
             db.session.add(message)
-            db.session.commit()
+            db.session.commit()  # Confirma la transacción
             return message
         except SQLAlchemyError as e:
             db.session.rollback()
             raise DatabaseError(f"Error al guardar mensaje: {str(e)}")
+        except Exception as e:
+            db.session.rollback()
+            raise DatabaseError(f"Error inesperado al guardar mensaje: {str(e)}")
     
     def find_by_message_id(self, message_id: str) -> Optional[Message]:
         """
@@ -185,3 +188,38 @@ class MessageRepository:
             return messages, total_results
         except SQLAlchemyError as e:
             raise DatabaseError(f"Error al buscar mensajes globalmente: {str(e)}")
+
+    def verify_persistence(self, message_id: str) -> bool:
+        """
+        Verifica que un mensaje esté realmente persistido en la BD.
+        Útil para debugging.
+        
+        Args:
+            message_id: ID del mensaje a verificar
+            
+        Returns:
+            bool: True si el mensaje está persistido
+        """
+        try:
+            # Fuerza una nueva consulta sin usar caché de sesión
+            db.session.expunge_all()
+            message = db.session.query(Message).filter_by(message_id=message_id).first()
+            return message is not None
+        except SQLAlchemyError as e:
+            raise DatabaseError(f"Error al verificar persistencia: {str(e)}")
+    
+    def get_all_messages_debug(self, limit: int = 50) -> List[Message]:
+        """
+        Obtiene todos los mensajes para debugging.
+        Solo para desarrollo/debugging.
+        
+        Args:
+            limit: Límite de mensajes a obtener
+            
+        Returns:
+            List[Message]: Lista de todos los mensajes
+        """
+        try:
+            return Message.query.order_by(Message.processed_at.desc()).limit(limit).all()
+        except SQLAlchemyError as e:
+            raise DatabaseError(f"Error al obtener mensajes para debug: {str(e)}")
