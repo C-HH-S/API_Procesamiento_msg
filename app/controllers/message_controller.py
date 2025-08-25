@@ -8,6 +8,7 @@ from typing import Tuple
 import json
 import traceback
 from werkzeug.exceptions import BadRequest
+from app.utils.auth import api_key_required
 
 from app.services.message_service import MessageService
 from app.schemas.message_schema import (
@@ -268,3 +269,39 @@ class MessageController:
                 'details': details
             }
         }
+        
+    def _register_routes(self):
+        """Registra las rutas del controlador."""
+        # Ruta para crear un mensaje
+        self.blueprint.route('/messages', methods=['POST'])(self.create_message)
+        
+        # Ruta para obtener mensajes por session_id
+        self.blueprint.route('/messages/<session_id>', methods=['GET'])(self.get_messages_by_session)
+        
+        # NUEVO: Ruta para obtener un solo mensaje por message_id
+        self.blueprint.route('/message/<message_id>', methods=['GET'])(self.get_message_by_id)
+        
+        # Ruta para obtener estadísticas de una sesión
+        self.blueprint.route('/messages/stats/<session_id>', methods=['GET'])(self.get_session_stats)
+    def get_message_by_id(self, message_id: str):
+        """Maneja la petición GET para obtener un solo mensaje por su ID."""
+        try:
+            # 1. Obtener mensaje del servicio
+            message = self.message_service.get_message_by_id(message_id)
+
+            # 2. Serializar y devolver el mensaje
+            response_data = {
+                'status': 'success',
+                'data': message
+            }
+            return response_data, 200
+
+        except MessageNotFoundError as e:
+            return self._error_response(e.code, e.message), 404
+        except Exception as e:
+            print(f"Error inesperado en get_message_by_id: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return self._error_response(
+                "INTERNAL_ERROR",
+                f"Error interno del servidor: {str(e)}"
+            ), 500

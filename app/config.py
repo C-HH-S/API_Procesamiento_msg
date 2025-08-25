@@ -13,6 +13,8 @@ class Config:
     
     # Clave secreta para sesiones y seguridad
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    # Lista de claves de API válidas, separadas por coma en .env
+    API_KEYS = [key.strip() for key in os.environ.get('API_KEYS', '').split(',') if key]
     
     # Configuración de base de datos SQLite
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///messages.db')
