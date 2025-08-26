@@ -34,24 +34,31 @@ Esta API permite:
 El proyecto sigue principios de **Arquitectura Limpia** con separación clara de responsabilidades:
 
 ```
-app/
-├── controllers/        # Controladores HTTP y WebSocket
-│   ├── message_controller.py
-│   └── realtime_controller.py
-├── services/          # Lógica de negocio
-│   └── message_service.py
-├── repositories/      # Acceso a datos
-│   └── message_repository.py
-├── models/           # Modelos de datos
-│   └── message.py
-├── schemas/          # Esquemas de validación
-│   └── message_schema.py
-├── utils/            # Utilidades y validadores
-│   ├── validators.py
-│   ├── auth.py
-│   └── exceptions.py
-├── config.py         # Configuraciones
-└── __init__.py       # Factory de aplicación
+message-processing-api/
+├── app/
+│   ├── __init__.py              # Factory de aplicación Flask
+│   ├── config.py                # Configuraciones de entorno
+│   ├── controllers/             # Controladores HTTP y WebSocket
+│   │   ├── message_controller.py
+│   │   └── realtime_controller.py
+│   ├── models/                  # Modelos de base de datos
+│   │   └── message.py
+│   ├── repositories/            # Capa de acceso a datos
+│   │   └── message_repository.py
+│   ├── services/               # Lógica de negocio
+│   │   └── message_service.py
+│   ├── schemas/                # Esquemas de validación
+│   │   └── message_schema.py
+│   └── utils/                  # Utilidades y helpers
+│       ├── auth.py
+│       ├── exceptions.py
+│       └── validators.py
+├── tests/                      # Suite de pruebas
+├── main.py                     # Punto de entrada
+├── requirements.txt            # Dependencias de Python
+├── Dockerfile                  # Configuración de Docker
+├── .env                       # Variables de entorno
+└── README.md                  # Este archivo
 ```
 
 ## 🚀 Instalación y Configuración
@@ -93,7 +100,7 @@ FLASK_ENV=development
 FLASK_DEBUG=True
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
-DATABASE_URL=sqlite:///messages.db
+DATABASE_FILENAME=messages.db
 SECRET_KEY=your-secret-key-change-in-production
 API_KEYS=key-123,test-key-456
 ```
@@ -130,7 +137,7 @@ curl -H "Authorization: Bearer key-123" \
 
 ### 📡 WebSocket en Tiempo Real
 
-La API incluye soporte WebSocket para recibir notificaciones de nuevos mensajes:
+La API incluye soporte WebSocket para recibir notificaciones de nuevos mensajes, se añadió un componente .html para realizar la prueba:
 
 ```javascript
 // Conectar al WebSocket
@@ -141,6 +148,14 @@ socket.on('new_message', (data) => {
     console.log('Nuevo mensaje:', data);
 });
 ```
+# Abrir en navegador
+open index_socket.html
+
+-**Eventos**
+
+-connect: Cuando se establece la conexión
+-disconnect: Cuando se cierra la conexión
+-new_message: Cuando se crea un nuevo mensaje (broadcast automático)
 
 ### 🎯 Rate Limiting
 
@@ -161,11 +176,11 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "session_id": "session-abcdef",
-  "content": "Hola, ¿cómo puedo ayudarte hoy?",
-  "sender": "system",
-  "message_id": "msg-123456",  // Opcional, se genera automáticamente
-  "timestamp": "2023-06-15T14:30:00Z"  // Opcional, se genera automáticamente
+  "message_id": "msg-unique-123",
+  "session_id": "session-abc-456",
+  "content": "Este es el contenido del mensaje",
+  "timestamp": "2023-06-15T14:30:00Z",
+  "sender": "user"
 }
 ```
 
@@ -174,14 +189,16 @@ Content-Type: application/json
 {
   "status": "success",
   "data": {
-    "message_id": "msg_20241224_143001_a1b2c3d4",
-    "session_id": "session-abcdef",
-    "content": "Hola, ¿cómo puedo ayudarte hoy?",
+    "message_id": "msg-unique-123",
+    "session_id": "session-abc-456",
+    "content": "Este es el contenido del mensaje",
     "timestamp": "2023-06-15T14:30:00Z",
-    "sender": "system",
+    "sender": "user",
     "metadata": {
-      "word_count": 6,
-      "character_count": 32
+      "word_count": 7,
+      "character_count": 34,
+      "processed_at": "2023-06-15T14:30:01Z",
+      "updated_at": "2023-06-15T14:30:01Z"
     }
   }
 }
@@ -195,51 +212,55 @@ Obtiene mensajes de una sesión con paginación.
 - `offset` (opcional): Desplazamiento para paginación (default: 0)
 - `sender` (opcional): Filtrar por remitente ("user" o "system")
 
-**Example:** `GET /api/messages/session-123?limit=5&offset=0&sender=user`
+**Example:** `GET /api/messages/session-05?limit=10&offset=0&sender=user`
 
 **Response (200):**
 ```json
 {
-  "status": "success",
-  "data": [
-    {
-      "message_id": "msg-123",
-      "session_id": "session-123",
-      "content": "Hola",
-      "timestamp": "2023-06-15T14:30:00Z",
-      "sender": "user",
-      "metadata": {
-        "word_count": 1,
-        "character_count": 4
-      }
-    }
-  ],
-  "pagination": {
-    "total": 1,
-    "limit": 5,
-    "offset": 0,
-    "has_next": false,
-    "has_prev": false
-  }
+    "data": [
+        {
+            "content": "¡Hola!, prueba con postman #3",
+            "message_id": "msg-13",
+            "metadata": {
+                "character_count": 29,
+                "processed_at": "2025-08-26T19:20:11.792081Z",
+                "updated_at": "2025-08-26T19:20:11.792081Z",
+                "word_count": 5
+            },
+            "sender": "system",
+            "session_id": "05",
+            "timestamp": "2023-06-15T14:30:00Z"
+        }
+    ],
+    "pagination": {
+        "has_next": false,
+        "has_prev": false,
+        "limit": 10,
+        "offset": 0,
+        "total": 1
+    },
+    "status": "success"
 }
 ```
 
 #### GET /api/message/{message_id}
-Obtiene un mensaje específico por ID.
+Obtiene un mensaje específico por message_id.
+**Example:** `GET /api/message/msg-001`
 
 #### GET /api/sessions/{session_id}/stats
 Obtiene estadísticas de una sesión.
+**Example:** `GET /api/sessions/session-04/stats`
 
 **Response (200):**
 ```json
 {
-  "status": "success",
-  "data": {
-    "session_id": "session-123",
-    "total_messages": 10,
-    "user_messages": 6,
-    "system_messages": 4
-  }
+    "data": {
+        "session_id": "04",
+        "system_messages": 2,
+        "total_messages": 2,
+        "user_messages": 0
+    },
+    "status": "success"
 }
 ```
 
@@ -256,25 +277,54 @@ Búsqueda global de mensajes.
 **Response (200):**
 ```json
 {
-  "data": [
-    {
-      "message_id": "msg-123",
-      "content": "Hola mundo",
-      "session_id": "session-1",
-      "timestamp": "2023-06-15T14:30:00Z",
-      "sender": "user",
-      "metadata": {
-        "word_count": 2,
-        "character_count": 10
-      }
-    }
-  ],
-  "pagination": {
-    "total_results": 5,
-    "limit": 10,
-    "offset": 0,
-    "next_offset": null
-  }
+    "data": [
+        {
+            "content": "olvide decir hola",
+            "message_id": "msg-11",
+            "metadata": {
+                "character_count": 26,
+                "processed_at": "2025-08-26T19:17:42.868392Z",
+                "updated_at": "2025-08-26T19:17:42.868392Z",
+                "word_count": 4
+            },
+            "sender": "system",
+            "session_id": "04",
+            "timestamp": "2023-06-15T14:30:00Z"
+        },
+        {
+            "content": "Hola, mi nombre es Claudia",
+            "message_id": "msg-12",
+            "metadata": {
+                "character_count": 29,
+                "processed_at": "2025-08-26T19:19:52.670528Z",
+                "updated_at": "2025-08-26T19:19:52.670528Z",
+                "word_count": 5
+            },
+            "sender": "system",
+            "session_id": "04",
+            "timestamp": "2023-06-15T14:30:00Z"
+        },
+        {
+            "content": "¡Hola!, como estas?",
+            "message_id": "msg-13",
+            "metadata": {
+                "character_count": 29,
+                "processed_at": "2025-08-26T19:20:11.792081Z",
+                "updated_at": "2025-08-26T19:20:11.792081Z",
+                "word_count": 5
+            },
+            "sender": "system",
+            "session_id": "05",
+            "timestamp": "2023-06-15T14:30:00Z"
+        }
+    ],
+    "pagination": {
+        "limit": 10,
+        "next_offset": null,
+        "offset": 0,
+        "total_results": 3
+    },
+    "status": "success"
 }
 ```
 
@@ -304,9 +354,11 @@ Todos los errores siguen el mismo formato estandarizado:
 {
   "status": "error",
   "error": {
-    "code": "ERROR_CODE",
+    "code": "VALIDATION_ERROR",
     "message": "Descripción del error",
-    "details": "Información adicional (opcional)"
+    "details": {
+      "missing_fields": ["timestamp", "sender"]
+    }
   }
 }
 ```
@@ -344,16 +396,16 @@ pytest
 pytest --cov=app --cov-report=html
 ```
 
-### Cobertura actual: >90% ✅
-
 ### Estructura de Pruebas
 
 ```
 tests/
-├── conftest.py                    # Configuración pytest
-├── test_message_repository.py     # Pruebas de acceso a datos
-├── test_message_service.py        # Pruebas de lógica de negocio
-└── test_message_controller.py     # Pruebas de integración API
+├── conftest.py                 # Configuración y fixtures compartidos
+├── test_auth.py               # Pruebas de autenticación
+├── test_message_controller.py # Pruebas de controladores
+├── test_message_repository.py # Pruebas de repositorio
+├── test_message_service.py    # Pruebas de servicios
+└── test_realtime_controller.py # Pruebas de WebSocket
 ```
 
 ### Ejecutar pruebas específicas
@@ -367,51 +419,31 @@ pytest tests/test_message_service.py -v
 # Pruebas del controlador
 pytest tests/test_message_controller.py -v
 ```
+El proyecto mantiene una alta cobertura de código. Para generar informes:
 
-## ✨ Características Implementadas
+# Generar reporte de cobertura en consola
+coverage report
 
-### Requisitos Funcionales ✅
-- [x] Endpoint POST `/api/messages` para crear mensajes
-- [x] Validación completa de formato de mensaje
-- [x] Esquema de mensaje con todos los campos requeridos
-- [x] Pipeline de procesamiento con filtrado de contenido
-- [x] Endpoint GET `/api/messages/{session_id}` con paginación
-- [x] Filtrado por remitente (sender)
-- [x] Manejo robusto de errores
+# Generar reporte HTML
+coverage html
 
-### Requisitos Técnicos ✅
-- [x] Python 3.10+
-- [x] Flask como framework
-- [x] SQLite para base de datos
-- [x] Pytest para pruebas
-- [x] Arquitectura limpia con separación de responsabilidades
-- [x] Inyección de dependencias
-- [x] Principios SOLID
+# Ver el reporte HTML
+# En Windows
+start htmlcov/index.html
 
-### Entregables ✅
-- [x] Código fuente completo
-- [x] requirements.txt
-- [x] README con documentación completa
-- [x] Pruebas unitarias e integración
-- [x] Cobertura de pruebas >80%
-- [x] Documentación de API
-- [x] Instrucciones de configuración
+# En Linux/Mac
+open htmlcov/index.html
 
-### 🎯 Funcionalidades Extra (Puntos Adicionales)
-- [x] **Autenticación con API Keys** - Sistema robusto de autenticación
-- [x] **WebSocket en tiempo real** - Notificaciones instantáneas de nuevos mensajes
-- [x] **Rate limiting** - 100 requests/hora por IP configurable
-- [x] **Búsqueda global de mensajes** - Búsqueda full-text paginada
-- [x] **Docker** - Containerización completa
-- [x] **Estadísticas de sesión** - Métricas detalladas por sesión
-- [x] **CORS habilitado** - Soporte para clientes web
-- [x] **Logging estructurado** - Sistema de logs completo
-- [x] **Configuración por entornos** - Development/Testing/Production
-- [x] **Manejo UTF-8 completo** - Soporte internacional
-- [x] **Health checks** - Monitoreo de estado
-- [x] **Paginación avanzada** - Con metadatos completos
-- [x] **Validación Marshmallow** - Esquemas robustos
-- [x] **Excepciones personalizadas** - Sistema de errores tipado
+**Fixtures Disponibles**
+Las pruebas incluyen fixtures útiles para testing:
+
+-app: Aplicación Flask configurada para testing
+-client: Cliente de prueba HTTP
+-message_repository: Repositorio de mensajes
+-message_service: Servicio de mensajes
+-sample_message_data: Datos de mensaje válidos
+-invalid_message_data: Datos de mensaje inválidos
+
 
 ## 🔧 Configuración Avanzada
 
@@ -434,12 +466,6 @@ SECRET_KEY=your-secret-key-here
 API_KEYS=key1,key2,key3  # Lista separada por comas
 ```
 
-### Configuración por Entornos
-
-- **Development**: Debug habilitado, base de datos local
-- **Testing**: Base de datos en memoria, configuraciones de prueba
-- **Production**: Optimizado para producción, logging completo
-
 ## 🛡️ Filtro de Contenido
 
 La API incluye un filtro de contenido que bloquea mensajes con:
@@ -450,107 +476,3 @@ La API incluye un filtro de contenido que bloquea mensajes con:
 - phishing
 
 Lista configurable en `app/config.py`.
-
-## 🌐 Cliente de Prueba WebSocket
-
-Incluye un cliente HTML para probar WebSocket en tiempo real:
-
-```bash
-# Abrir en navegador
-open index_socket.html
-```
-
-## 📊 Métricas y Monitoreo
-
-- `/health` - Estado de la aplicación
-- Logs estructurados para debugging
-- Métricas de rendimiento en endpoints
-- Rate limiting con headers informativos
-
-## 🚀 Despliegue
-
-### Desarrollo Local
-```bash
-python main.py
-```
-
-### Con Docker
-```bash
-docker build -t message-api .
-docker run -p 5000:5000 message-api
-```
-
-### Producción
-```bash
-export FLASK_ENV=production
-export FLASK_DEBUG=False
-pip install gunicorn
-gunicorn --worker-class eventlet -w 1 main:app -b 0.0.0.0:5000
-```
-
-## 📈 Rendimiento
-
-- **Rate limiting**: 100 requests/hora por endpoint
-- **Base de datos**: SQLite optimizada con índices
-- **WebSocket**: Comunicación asíncrona eficiente
-- **Paginación**: Consultas optimizadas para grandes datasets
-
-## 🤝 Contribución
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -am 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crear un Pull Request
-
-## 🔍 Testing API
-
-### Ejemplos con cURL
-
-```bash
-# Crear mensaje
-curl -X POST "http://localhost:5000/api/messages" \
-     -H "Authorization: Bearer key-123" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "session_id": "test-session",
-       "content": "Hola mundo",
-       "sender": "user"
-     }'
-
-# Obtener mensajes por sesión
-curl -X GET "http://localhost:5000/api/messages/test-session?limit=10" \
-     -H "Authorization: Bearer key-123"
-
-# Buscar mensajes globalmente
-curl -X GET "http://localhost:5000/api/messages/search/all?query=hola" \
-     -H "Authorization: Bearer key-123"
-
-# Obtener estadísticas
-curl -X GET "http://localhost:5000/api/sessions/test-session/stats" \
-     -H "Authorization: Bearer key-123"
-
-# Health check (sin auth)
-curl -X GET "http://localhost:5000/health"
-```
-
-## 📝 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detalles.
-
-## 👨‍💻 Autor
-
-Desarrollado como evaluación técnica para **Desarrollador Backend Python**.
-
----
-
-## 🔥 Resumen de Valor
-
-✅ **100% de Requisitos Funcionales Cubiertos**  
-✅ **Arquitectura Limpia y Escalable**  
-✅ **Pruebas Exhaustivas (>90% cobertura)**  
-✅ **Funcionalidades Extra Implementadas**  
-✅ **Documentación Completa**  
-✅ **Listo para Producción**
-
-**¡Una API robusta, moderna y completamente funcional!** 🚀
