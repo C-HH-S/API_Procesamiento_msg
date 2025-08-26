@@ -8,7 +8,6 @@ ENV/
 .venv/
 
 # Archivos de entorno
-.env
 .env.local
 .env.production
 .env.development

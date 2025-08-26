@@ -247,3 +247,18 @@ class MessageService:
     def delete_message(self, message_id: str) -> bool:
         """Elimina un mensaje por ID y retorna True si se eliminó, False si no se encontró."""
         return self.message_repository.delete_by_message_id(message_id)
+
+    def _validate_basic_fields(self, message_data):
+        """Valida que los campos básicos requeridos no estén vacíos o ausentes."""
+        required_fields = ['message_id', 'session_id', 'timestamp', 'content', 'sender']
+        missing_fields = []
+
+        for field in required_fields:
+            if field not in message_data or not str(message_data.get(field)).strip():
+                missing_fields.append(field)
+
+        if missing_fields:
+            raise ValidationError(
+                code="MISSING_FIELDS",
+                message=f"Faltan los siguientes campos obligatorios: {', '.join(missing_fields)}"
+            )
