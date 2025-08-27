@@ -42,6 +42,7 @@ class MessageService:
         """
         # 1. Validar campos básicos requeridos
         self._validate_basic_fields(message_data)
+        MessageValidator.validate_message_data(message_data)
         
         # 2. Verificar si el message_id ya existe (solo si se proporciona)
         if message_data.get('message_id') and self.message_repository.exists_by_message_id(message_data['message_id']):
@@ -74,7 +75,7 @@ class MessageService:
             ValidationError: Si faltan campos requeridos
             InvalidFormatError: Si el formato es inválido
         """
-        # Todos los campos son ahora requeridos
+        # Todos los campos son requeridos
         required_fields = ['message_id', 'session_id', 'content', 'timestamp', 'sender']
         missing_fields = [field for field in required_fields if field not in data or data[field] is None or data[field] == ""]
         
@@ -116,7 +117,7 @@ class MessageService:
         # Validar parámetros de paginación
         limit, offset = PaginationValidator.validate_pagination_params(limit, offset, 100)
         
-        # Validar sender si se proporciona
+        # Validar sender si 
         if sender and sender not in MessageValidator.VALID_SENDERS:
             raise ValidationError(f"sender debe ser uno de: {MessageValidator.VALID_SENDERS}")
         
@@ -259,6 +260,6 @@ class MessageService:
 
         if missing_fields:
             raise ValidationError(
-                code="MISSING_FIELDS",
-                message=f"Faltan los siguientes campos obligatorios: {', '.join(missing_fields)}"
-            )
+            f"Campos requeridos faltantes: {', '.join(missing_fields)}",
+            details={"missing_fields": missing_fields}
+        )

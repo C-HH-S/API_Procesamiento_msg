@@ -20,6 +20,7 @@ def app():
     app = create_app('testing')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['TESTING'] = True
+    app.config['API_KEYS'] = ['test-api-key']
     
     with app.app_context():
         db.create_all()
@@ -30,9 +31,18 @@ def app():
     os.unlink(db_path)
 
 @pytest.fixture
+def authenticated_client(app):
+    client_instance = app.test_client()
+    client_instance.environ_base['HTTP_AUTHORIZATION'] = 'Bearer test-api-key'
+    
+    return client_instance
+
+@pytest.fixture
 def client(app):
-    """Fixture que crea un cliente de prueba."""
-    return app.test_client()
+    client_instance = app.test_client()
+    client_instance.environ_base['HTTP_AUTHORIZATION'] = 'Bearer test-api-key'
+    
+    return client_instance
 
 @pytest.fixture
 def runner(app):
