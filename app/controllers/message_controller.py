@@ -11,6 +11,7 @@ from app import limiter
 from werkzeug.exceptions import BadRequest
 from app.utils.auth import api_key_required
 from app.controllers.realtime_controller import broadcast_new_message
+from flask import current_app
 
 from app.services.message_service import MessageService
 from app.schemas.message_schema import (
@@ -45,7 +46,7 @@ class MessageController:
     def _register_routes(self):
         """Registra las rutas del controlador."""
         self.blueprint.route('/messages', methods=['POST'])(
-            api_key_required(limiter.limit("100 per hour")(self.create_message))
+            limiter.limit(lambda: current_app.config.get("RATELIMIT_DEFAULT", "100 per hour"))(self.create_message)
         )
 
         self.blueprint.route('/messages/<session_id>', methods=['GET'])(

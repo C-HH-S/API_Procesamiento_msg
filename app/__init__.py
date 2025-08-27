@@ -39,6 +39,8 @@ def create_app(config_name=None):
     socketio.init_app(app)
      # Inicializar la extensión Limiter con la app
     limiter.init_app(app)
+    if app.config["TESTING"]:
+        limiter.enabled = False
     
     from app.controllers.message_controller import MessageController
     from app.controllers.realtime_controller import broadcast_new_message, handle_connect, handle_disconnect
