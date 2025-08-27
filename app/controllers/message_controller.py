@@ -46,7 +46,7 @@ class MessageController:
     def _register_routes(self):
         """Registra las rutas del controlador."""
         self.blueprint.route('/messages', methods=['POST'])(
-            limiter.limit(lambda: current_app.config.get("RATELIMIT_DEFAULT", "100 per hour"))(self.create_message)
+            api_key_required(limiter.limit(lambda: current_app.config.get("RATELIMIT_DEFAULT", "100 per hour"))(self.create_message))
         )
 
         self.blueprint.route('/messages/<session_id>', methods=['GET'])(
